@@ -39,4 +39,22 @@ class StandupTestService {
 
     await _client.from(StandupTests.table_name).insert(payload);
   }
+
+  Future<List<StandupTests>> getTestHistory({
+    required String patientId,
+    int? limit,
+  }) async {
+    final query = _client
+        .from(StandupTests.table_name)
+        .select()
+        .eq('patient_id', patientId)
+        .order('created_at', ascending: false);
+
+    if (limit != null) {
+      query.limit(limit);
+    }
+
+    final response = await query;
+    return response.map((json) => StandupTests.fromJson(json)).toList();
+  }
 }

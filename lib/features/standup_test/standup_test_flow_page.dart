@@ -67,8 +67,122 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
           ),
         ],
       ),
-      body: Padding(padding: const EdgeInsets.all(24), child: _buildBody()),
+      body: Column(
+        children: [
+          _buildProgressIndicator(),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(24), 
+              child: _buildBody(),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildProgressIndicator() {
+    final currentStep = _getCurrentStepNumber();
+    final totalSteps = 5;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Step $currentStep of $totalSteps',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                '${(currentStep / totalSteps * 100).round()}%',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            value: currentStep / totalSteps,
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _getCurrentStepDescription(),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  int _getCurrentStepNumber() {
+    switch (_controller.step) {
+      case StandupStep.intro:
+        return 1;
+      case StandupStep.supineCountdown:
+      case StandupStep.supineEntry:
+        return 2;
+      case StandupStep.standPrep:
+      case StandupStep.standingCountdown1:
+      case StandupStep.standingEntry1:
+        return 3;
+      case StandupStep.standingCountdownTo3:
+      case StandupStep.standingEntry3:
+        return 4;
+      case StandupStep.standingCountdownTo5:
+      case StandupStep.standingCountdownTo10:
+      case StandupStep.summary:
+      case StandupStep.submitting:
+        return 5;
+      case StandupStep.completed:
+      case StandupStep.error:
+        return 5;
+    }
+  }
+
+  String _getCurrentStepDescription() {
+    switch (_controller.step) {
+      case StandupStep.intro:
+        return 'Introduction and preparation';
+      case StandupStep.supineCountdown:
+        return 'Lying down for 10 minutes';
+      case StandupStep.supineEntry:
+        return 'Recording supine blood pressure';
+      case StandupStep.standPrep:
+        return 'Preparing to stand up';
+      case StandupStep.standingCountdown1:
+        return 'Standing for 1 minute';
+      case StandupStep.standingEntry1:
+        return 'Recording 1-minute standing BP';
+      case StandupStep.standingCountdownTo3:
+        return 'Standing up to 3 minutes';
+      case StandupStep.standingEntry3:
+        return 'Recording 3-minute standing BP';
+      case StandupStep.standingCountdownTo5:
+        return 'Standing up to 5 minutes';
+      case StandupStep.standingCountdownTo10:
+        return 'Standing up to 10 minutes';
+      case StandupStep.summary:
+        return 'Reviewing and submitting results';
+      case StandupStep.submitting:
+        return 'Submitting test results';
+      case StandupStep.completed:
+        return 'Test completed successfully';
+      case StandupStep.error:
+        return 'Test encountered an error';
+    }
   }
 
   Widget _buildBody() {
@@ -272,7 +386,7 @@ class _CountdownStep extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  latestHr != null ? '${latestHr} bpm' : 'Waiting for data…',
+                  latestHr != null ? '$latestHr bpm' : 'Waiting for data…',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),

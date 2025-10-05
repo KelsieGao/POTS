@@ -270,7 +270,7 @@ class _PatientSignupFormState extends State<PatientSignupForm> {
 
   Widget _buildSexAssignedAtBirthField() {
     return DropdownButtonFormField<String>(
-      value: _data.sexAssignedAtBirth,
+      initialValue: _data.sexAssignedAtBirth,
       decoration: const InputDecoration(
         labelText: 'Sex assigned at birth',
         border: OutlineInputBorder(),
@@ -290,7 +290,7 @@ class _PatientSignupFormState extends State<PatientSignupForm> {
 
   Widget _buildReasonField() {
     return DropdownButtonFormField<String>(
-      value: _data.reasonForUsingApp,
+      initialValue: _data.reasonForUsingApp,
       decoration: const InputDecoration(
         labelText: 'Why are you using this app?',
         border: OutlineInputBorder(),

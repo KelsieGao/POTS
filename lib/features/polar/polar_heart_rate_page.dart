@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:pots/features/standup_test/standup_test_flow_page.dart';
+import 'package:pots/features/standup_test/test_history_page.dart';
 import 'package:pots/features/voss_questionnaire/voss_questionnaire_page.dart';
+import 'package:pots/features/symptom_logging/symptom_selection_page.dart';
+import 'package:pots/features/symptom_logging/symptom_history_page.dart';
 
 import '../patient_signup/patient_signup_page.dart';
 import '../patient_signup/providers/patient_signup_controller.dart';
@@ -127,6 +130,7 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
       );
       return;
     }
+    if (!mounted) return;
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => StandupTestFlowPage(
@@ -218,6 +222,43 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
               icon: const Icon(Icons.accessibility_new),
               label: const Text('Start Sit/Stand Protocol'),
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _startSymptomLogging,
+                    icon: const Icon(Icons.favorite_border),
+                    label: const Text('Log Symptoms'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF20B2AA),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _viewSymptomHistory,
+                    icon: const Icon(Icons.history),
+                    label: const Text('History'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF20B2AA),
+                      side: const BorderSide(color: Color(0xFF20B2AA)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: _viewTestHistory,
+              icon: const Icon(Icons.assignment_outlined),
+              label: const Text('Test History'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.primary,
+                side: BorderSide(color: Theme.of(context).colorScheme.primary),
+              ),
+            ),
             const SizedBox(height: 16),
             const Spacer(),
             FilledButton.icon(
@@ -247,6 +288,63 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
     return status == PolarConnectionStatus.connected ||
         status == PolarConnectionStatus.streaming;
   }
+
+  Future<void> _startSymptomLogging() async {
+    final patientId = _patientController.patientId;
+    if (patientId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please create a patient profile first'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => SymptomSelectionPage(patientId: patientId),
+      ),
+    );
+  }
+
+  Future<void> _viewSymptomHistory() async {
+    final patientId = _patientController.patientId;
+    if (patientId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please create a patient profile first'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => SymptomHistoryPage(patientId: patientId),
+      ),
+    );
+  }
+
+  Future<void> _viewTestHistory() async {
+    final patientId = _patientController.patientId;
+    if (patientId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please create a patient profile first'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => TestHistoryPage(patientId: patientId),
+      ),
+    );
+  }
 }
 
 class _HeartRateCard extends StatelessWidget {
@@ -265,7 +363,7 @@ class _HeartRateCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant,
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
