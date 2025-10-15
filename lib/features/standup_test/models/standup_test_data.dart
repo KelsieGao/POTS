@@ -18,6 +18,8 @@ class StandupTestData {
 
   int? standing5MinHr;
   int? standing10MinHr;
+  int? standing10MinSystolic;
+  int? standing10MinDiastolic;
 
   String? notes;
 }

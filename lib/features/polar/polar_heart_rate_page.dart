@@ -195,9 +195,10 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             _HeartRateCard(bpm: bpm, streaming: isStreaming),
             const SizedBox(height: 24),
             Wrap(
@@ -260,7 +261,7 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
               ),
             ),
             const SizedBox(height: 16),
-            const Spacer(),
+            const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _polarController.isBusy ? null : _openConnectionSheet,
               icon: const Icon(Icons.bluetooth_searching),
@@ -277,7 +278,9 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
                   : null,
               child: const Text('Disconnect'),
             ),
-          ],
+            const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );

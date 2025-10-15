@@ -48,6 +48,7 @@ class StandupTestController extends ChangeNotifier {
   int? get latestHeartRate => polarController.heartRate;
 
   String? errorMessage;
+  bool disposed = false;
 
   void next() {
     switch (step) {
@@ -79,30 +80,63 @@ class StandupTestController extends ChangeNotifier {
     data.supineSystolic = systolic;
     data.supineDiastolic = diastolic;
     data.supineHr = latestHeartRate;
-    step = StandupStep.supineEntry;
+    
+    // Automatically advance to stand prep after BP entry
+    step = StandupStep.standPrep;
     notifyListeners();
+    
+    // Auto-advance to standing countdown after 3 seconds
+    Timer(const Duration(seconds: 3), () {
+      if (step == StandupStep.standPrep && !disposed) {
+        _startStandingCountdown1();
+      }
+    });
   }
 
   void setStanding1Min({required int systolic, required int diastolic}) {
     data.standing1MinSystolic = systolic;
     data.standing1MinDiastolic = diastolic;
     data.standing1MinHr = latestHeartRate;
+    
+    // Automatically advance to next countdown
     step = StandupStep.standingEntry1;
     notifyListeners();
+    
+    // Auto-advance after 3 seconds
+    Timer(const Duration(seconds: 3), () {
+      if (step == StandupStep.standingEntry1 && !disposed) {
+        _startStandingCountdownTo3();
+      }
+    });
   }
 
   void setStanding3Min({required int systolic, required int diastolic}) {
     data.standing3MinSystolic = systolic;
     data.standing3MinDiastolic = diastolic;
     data.standing3MinHr = latestHeartRate;
+    
+    // Automatically advance to next countdown
     step = StandupStep.standingEntry3;
     notifyListeners();
+    
+    // Auto-advance after 3 seconds
+    Timer(const Duration(seconds: 3), () {
+      if (step == StandupStep.standingEntry3 && !disposed) {
+        _startStandingCountdownTo5();
+      }
+    });
   }
 
   void cancelCountdown() {
     _timer?.cancel();
     _timer = null;
     remaining = null;
+    notifyListeners();
+  }
+
+  void cancelTest() {
+    cancelCountdown();
+    step = StandupStep.completed; // Mark as completed to exit
     notifyListeners();
   }
 
@@ -117,6 +151,14 @@ class StandupTestController extends ChangeNotifier {
     data.supineHr = latestHeartRate;
     step = StandupStep.supineEntry;
     notifyListeners();
+    
+    // Auto-advance after 5 seconds to give user time to read instructions
+    Timer(const Duration(seconds: 5), () {
+      if (step == StandupStep.supineEntry && !disposed) {
+        step = StandupStep.standPrep;
+        notifyListeners();
+      }
+    });
   }
 
   void _startStandingCountdown1() {
@@ -129,6 +171,13 @@ class StandupTestController extends ChangeNotifier {
     data.standing1MinHr = latestHeartRate;
     step = StandupStep.standingEntry1;
     notifyListeners();
+    
+    // Auto-advance after 5 seconds to give user time to read instructions
+    Timer(const Duration(seconds: 5), () {
+      if (step == StandupStep.standingEntry1 && !disposed) {
+        _startStandingCountdownTo3();
+      }
+    });
   }
 
   void _startStandingCountdownTo3() {
@@ -141,6 +190,13 @@ class StandupTestController extends ChangeNotifier {
     data.standing3MinHr = latestHeartRate;
     step = StandupStep.standingEntry3;
     notifyListeners();
+    
+    // Auto-advance after 5 seconds to give user time to read instructions
+    Timer(const Duration(seconds: 5), () {
+      if (step == StandupStep.standingEntry3 && !disposed) {
+        _startStandingCountdownTo5();
+      }
+    });
   }
 
   void _startStandingCountdownTo5() {
@@ -164,6 +220,30 @@ class StandupTestController extends ChangeNotifier {
     data.standing10MinHr = latestHeartRate;
     step = StandupStep.summary;
     notifyListeners();
+    
+    // Auto-submit after 5 seconds
+    Timer(const Duration(seconds: 5), () {
+      if (step == StandupStep.summary && !disposed) {
+        submit();
+      }
+    });
+  }
+  
+  // Add method for final BP reading (optional 10-minute reading)
+  void setStanding10Min({required int systolic, required int diastolic}) {
+    data.standing10MinSystolic = systolic;
+    data.standing10MinDiastolic = diastolic;
+    data.standing10MinHr = latestHeartRate;
+    
+    // Automatically submit after final reading
+    step = StandupStep.summary;
+    notifyListeners();
+    
+    Timer(const Duration(seconds: 3), () {
+      if (step == StandupStep.summary && !disposed) {
+        submit();
+      }
+    });
   }
 
   void _startTimer(Duration duration, VoidCallback onComplete) {
@@ -227,6 +307,7 @@ class StandupTestController extends ChangeNotifier {
 
   @override
   void dispose() {
+    disposed = true;
     cancelCountdown();
     super.dispose();
   }

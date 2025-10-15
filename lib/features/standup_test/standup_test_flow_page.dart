@@ -1,10 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:pots/features/polar/polar_heart_rate_controller.dart';
 import 'package:pots/features/standup_test/models/standup_test_data.dart';
+import 'package:pots/features/standup_test/pages/safety_acknowledgment_page.dart';
+import 'package:pots/features/standup_test/services/safety_service.dart';
 
 import 'controllers/standup_test_controller.dart';
 import 'widgets/countdown_display.dart';
+import 'widgets/pots_instruction_video.dart';
+import 'widgets/automated_bp_input.dart';
 
 class StandupTestFlowPage extends StatefulWidget {
   const StandupTestFlowPage({
@@ -37,6 +42,9 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
       patientId: widget.patientId,
       demoMode: widget.demoMode,
     )..addListener(_handleUpdate);
+    
+    // Check for safety acknowledgment before starting
+    _checkSafetyAcknowledgment();
   }
 
   void _handleUpdate() {
@@ -46,6 +54,62 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
       Navigator.of(context).pop(true);
     }
     setState(() {});
+  }
+
+  Future<void> _checkSafetyAcknowledgment() async {
+    try {
+      final hasValidAcknowledgment = await SafetyService.hasValidSafetyAcknowledgment(widget.patientId);
+      if (!hasValidAcknowledgment && mounted) {
+        await _showSafetyAcknowledgment();
+      }
+    } catch (e) {
+      print('Error checking safety acknowledgment: $e');
+      // Continue with test even if check fails
+    }
+  }
+
+  Future<void> _showSafetyAcknowledgment() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => SafetyAcknowledgmentPage(
+          patientId: widget.patientId,
+          onCompleted: () {
+            // Safety acknowledgment completed, continue with test
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCancelConfirmation() async {
+    final shouldCancel = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Test'),
+        content: const Text(
+          'Are you sure you want to cancel the test? All progress will be lost.\n\n'
+          'If you are feeling unwell, please sit down and rest immediately.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Continue Test'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Cancel Test'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldCancel == true && mounted) {
+      _controller.cancelTest();
+      Navigator.of(context).pop(false); // Return false to indicate test was cancelled
+    }
   }
 
   @override
@@ -61,6 +125,15 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
       appBar: AppBar(
         title: const Text('Sit/Stand Protocol'),
         actions: [
+          // Emergency cancel button - always visible
+          IconButton(
+            onPressed: _showCancelConfirmation,
+            icon: const Icon(Icons.stop),
+            tooltip: 'Cancel Test',
+            style: IconButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+          ),
           TextButton(
             onPressed: () => Navigator.of(context).maybePop(),
             child: const Text('Close'),
@@ -197,23 +270,24 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
           remaining: _controller.remaining,
           latestHr: _controller.latestHeartRate,
           onSkip: _controller.demoMode ? _controller.skipCurrentStep : null,
+          onCancel: _showCancelConfirmation,
+          showSafetyReminder: true,
         );
       case StandupStep.supineEntry:
-        return _SupineEntryForm(
-          formKey: _supineFormKey,
+        return AutomatedBpInput(
+          title: 'Supine Blood Pressure Reading',
+          instruction: 'Take your blood pressure while lying down. Enter both values to continue automatically.',
           onSubmit: (systolic, diastolic) {
             _controller.setSupineBp(systolic: systolic, diastolic: diastolic);
-            _controller.next();
           },
           latestHr: _controller.latestHeartRate,
         );
       case StandupStep.standPrep:
-        return _InstructionStep(
-          title: 'Stand up',
-          description:
-              'Please stand up carefully. You may lean on a wall if needed. Keep still while standing.',
-          buttonLabel: 'Start standing timer',
-          onContinue: _controller.next,
+        return _AutomaticInstructionStep(
+          title: 'Stand Up Now',
+          description: 'Please stand up carefully. You may lean on a wall if needed. Keep still while standing.',
+          countdownDuration: const Duration(seconds: 10),
+          onComplete: _controller.next,
         );
       case StandupStep.standingCountdown1:
         return _CountdownStep(
@@ -222,17 +296,18 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
           remaining: _controller.remaining,
           latestHr: _controller.latestHeartRate,
           onSkip: _controller.demoMode ? _controller.skipCurrentStep : null,
+          onCancel: _showCancelConfirmation,
+          showSafetyReminder: true,
         );
       case StandupStep.standingEntry1:
-        return _StandingEntryForm(
-          title: '1-minute blood pressure',
-          formKey: _standing1FormKey,
+        return AutomatedBpInput(
+          title: '1-Minute Standing Blood Pressure',
+          instruction: 'You\'ve been standing for 1 minute. Take your blood pressure reading now.',
           onSubmit: (systolic, diastolic) {
             _controller.setStanding1Min(
               systolic: systolic,
               diastolic: diastolic,
             );
-            _controller.next();
           },
           latestHr: _controller.latestHeartRate,
         );
@@ -244,17 +319,18 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
           remaining: _controller.remaining,
           latestHr: _controller.latestHeartRate,
           onSkip: _controller.demoMode ? _controller.skipCurrentStep : null,
+          onCancel: _showCancelConfirmation,
+          showSafetyReminder: true,
         );
       case StandupStep.standingEntry3:
-        return _StandingEntryForm(
-          title: '3-minute blood pressure',
-          formKey: _standing3FormKey,
+        return AutomatedBpInput(
+          title: '3-Minute Standing Blood Pressure',
+          instruction: 'You\'ve been standing for 3 minutes. Take your blood pressure reading now.',
           onSubmit: (systolic, diastolic) {
             _controller.setStanding3Min(
               systolic: systolic,
               diastolic: diastolic,
             );
-            _controller.next();
           },
           latestHr: _controller.latestHeartRate,
         );
@@ -266,6 +342,8 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
           remaining: _controller.remaining,
           latestHr: _controller.latestHeartRate,
           onSkip: _controller.demoMode ? _controller.skipCurrentStep : null,
+          onCancel: _showCancelConfirmation,
+          showSafetyReminder: true,
         );
       case StandupStep.standingCountdownTo10:
         return _CountdownStep(
@@ -275,6 +353,8 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
           remaining: _controller.remaining,
           latestHr: _controller.latestHeartRate,
           onSkip: _controller.demoMode ? _controller.skipCurrentStep : null,
+          onCancel: _showCancelConfirmation,
+          showSafetyReminder: true,
         );
       case StandupStep.summary:
         return _SummaryStep(
@@ -311,15 +391,47 @@ class _IntroStep extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: Colors.black12,
-                    borderRadius: BorderRadius.circular(16),
+                // Safety warning at the top
+                Card(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: Theme.of(context).colorScheme.onErrorContainer,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Safety First',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onErrorContainer,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '• Have someone nearby if you have a history of fainting\n'
+                          '• Stop immediately if you feel dizzy or unwell\n'
+                          '• Ensure a safe environment with no obstacles\n'
+                          '• Use the red cancel button if you need to stop',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onErrorContainer,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  alignment: Alignment.center,
-                  child: const Text('Instructional video placeholder'),
                 ),
+                const SizedBox(height: 24),
+                const PotsVideoPlaceholder(),
                 const SizedBox(height: 24),
                 Text(
                   'Sit/Stand Test Overview',
@@ -330,14 +442,22 @@ class _IntroStep extends StatelessWidget {
                   '1. Put on your blood pressure cuff and Polar heart rate monitor.\n'
                   '2. Lie down for 10 minutes while the timer runs.\n'
                   '3. Take your blood pressure, enter the values, then stand up.\n'
-                  '4. We\'ll prompt you for additional readings while you remain standing.',
+                  '4. We\'ll prompt you for additional readings while you remain standing.\n\n'
+                  'The test will take approximately 20-25 minutes to complete.',
                 ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 16),
-        FilledButton(onPressed: onStart, child: const Text('Begin')),
+        FilledButton(
+          onPressed: onStart,
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+          child: const Text('Begin Test'),
+        ),
       ],
     );
   }
@@ -350,6 +470,8 @@ class _CountdownStep extends StatelessWidget {
     required this.remaining,
     required this.latestHr,
     this.onSkip,
+    this.onCancel,
+    this.showSafetyReminder = false,
   });
 
   final String title;
@@ -357,6 +479,8 @@ class _CountdownStep extends StatelessWidget {
   final Duration? remaining;
   final int? latestHr;
   final VoidCallback? onSkip;
+  final VoidCallback? onCancel;
+  final bool showSafetyReminder;
 
   @override
   Widget build(BuildContext context) {
@@ -395,10 +519,61 @@ class _CountdownStep extends StatelessWidget {
             ),
           ),
         ),
-        if (onSkip != null) ...[
+        if (showSafetyReminder) ...[
           const SizedBox(height: 24),
-          TextButton(onPressed: onSkip, child: const Text('Skip timer (demo)')),
+          Card(
+            color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Theme.of(context).colorScheme.error,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'If you feel dizzy or unwell, sit down immediately and cancel the test.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            if (onCancel != null) ...[
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onCancel,
+                  icon: const Icon(Icons.stop),
+                  label: const Text('Cancel Test'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            if (onSkip != null) ...[
+              Expanded(
+                child: TextButton(
+                  onPressed: onSkip,
+                  child: const Text('Skip timer (demo)'),
+                ),
+              ),
+            ],
+          ],
+        ),
       ],
     );
   }
@@ -585,29 +760,139 @@ class _StandingEntryFormState extends State<_StandingEntryForm> {
   }
 }
 
-class _InstructionStep extends StatelessWidget {
-  const _InstructionStep({
+class _AutomaticInstructionStep extends StatefulWidget {
+  const _AutomaticInstructionStep({
     required this.title,
     required this.description,
-    required this.buttonLabel,
-    required this.onContinue,
+    required this.countdownDuration,
+    required this.onComplete,
   });
 
   final String title;
   final String description;
-  final String buttonLabel;
-  final VoidCallback onContinue;
+  final Duration countdownDuration;
+  final VoidCallback onComplete;
+
+  @override
+  State<_AutomaticInstructionStep> createState() => _AutomaticInstructionStepState();
+}
+
+class _AutomaticInstructionStepState extends State<_AutomaticInstructionStep> {
+  late Duration _remaining;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _remaining = widget.countdownDuration;
+    _startCountdown();
+  }
+
+  void _startCountdown() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _remaining = Duration(seconds: _remaining.inSeconds - 1);
+        });
+        
+        if (_remaining.inSeconds <= 0) {
+          timer.cancel();
+          widget.onComplete();
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(title, style: Theme.of(context).textTheme.headlineSmall),
+        Text(
+          widget.title, 
+          style: Theme.of(context).textTheme.headlineSmall,
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 12),
-        Text(description, style: Theme.of(context).textTheme.bodyLarge),
+        Text(
+          widget.description, 
+          style: Theme.of(context).textTheme.bodyLarge,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 32),
+        
+        // Countdown Display
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              const Icon(
+                Icons.timer,
+                size: 48,
+                color: Colors.orange,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '${_remaining.inSeconds}',
+                style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'seconds remaining',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 24),
+        
+        // Progress indicator
+        LinearProgressIndicator(
+          value: 1.0 - (_remaining.inSeconds / widget.countdownDuration.inSeconds),
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+          valueColor: AlwaysStoppedAnimation<Color>(
+            Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        
         const Spacer(),
-        FilledButton(onPressed: onContinue, child: Text(buttonLabel)),
+        
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.blue.shade200),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, color: Colors.blue),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Continuing automatically...',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.blue.shade700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

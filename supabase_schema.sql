@@ -4,6 +4,7 @@
 -- Drop existing tables if they exist (to start fresh)
 DROP TABLE IF EXISTS symptom_logs CASCADE;
 DROP TABLE IF EXISTS symptoms CASCADE;
+DROP TABLE IF EXISTS safety_acknowledgments CASCADE;
 
 -- Enable Row Level Security
 ALTER TABLE IF EXISTS patients ENABLE ROW LEVEL SECURITY;
@@ -34,9 +35,29 @@ CREATE TABLE symptom_logs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create safety_acknowledgments table
+CREATE TABLE safety_acknowledgments (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    patient_id TEXT NOT NULL,
+    acknowledged_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    risk_acknowledged BOOLEAN NOT NULL DEFAULT FALSE,
+    liability_acknowledged BOOLEAN NOT NULL DEFAULT FALSE,
+    safety_warnings_read BOOLEAN NOT NULL DEFAULT FALSE,
+    companion_recommended BOOLEAN NOT NULL DEFAULT FALSE,
+    emergency_contact_provided BOOLEAN NOT NULL DEFAULT FALSE,
+    emergency_contact_name TEXT,
+    emergency_contact_phone TEXT,
+    medical_conditions TEXT,
+    medications TEXT,
+    test_id TEXT, -- Link to specific test if applicable
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Enable RLS for new tables
 ALTER TABLE symptoms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE symptom_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE safety_acknowledgments ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for symptoms table (public read access)
 CREATE POLICY "Symptoms are viewable by everyone" ON symptoms
@@ -59,6 +80,19 @@ CREATE POLICY "Anyone can update symptom logs" ON symptom_logs
     FOR UPDATE USING (true);
 
 CREATE POLICY "Anyone can delete symptom logs" ON symptom_logs
+    FOR DELETE USING (true);
+
+-- Create policies for safety_acknowledgments table (public access for now)
+CREATE POLICY "Anyone can view safety acknowledgments" ON safety_acknowledgments
+    FOR SELECT USING (true);
+
+CREATE POLICY "Anyone can insert safety acknowledgments" ON safety_acknowledgments
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Anyone can update safety acknowledgments" ON safety_acknowledgments
+    FOR UPDATE USING (true);
+
+CREATE POLICY "Anyone can delete safety acknowledgments" ON safety_acknowledgments
     FOR DELETE USING (true);
 
 -- Insert predefined symptoms
@@ -85,6 +119,10 @@ CREATE INDEX IF NOT EXISTS idx_symptom_logs_patient_id ON symptom_logs(patient_i
 CREATE INDEX IF NOT EXISTS idx_symptom_logs_timestamp ON symptom_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_symptom_logs_created_at ON symptom_logs(created_at);
 
+CREATE INDEX IF NOT EXISTS idx_safety_acknowledgments_patient_id ON safety_acknowledgments(patient_id);
+CREATE INDEX IF NOT EXISTS idx_safety_acknowledgments_acknowledged_at ON safety_acknowledgments(acknowledged_at);
+CREATE INDEX IF NOT EXISTS idx_safety_acknowledgments_created_at ON safety_acknowledgments(created_at);
+
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -99,6 +137,9 @@ CREATE TRIGGER update_symptoms_updated_at BEFORE UPDATE ON symptoms
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_symptom_logs_updated_at BEFORE UPDATE ON symptom_logs
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_safety_acknowledgments_updated_at BEFORE UPDATE ON safety_acknowledgments
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Grant necessary permissions
