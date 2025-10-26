@@ -70,7 +70,7 @@ class ClinicianService {
       final patientQuery = _client
           .from('patients')
           .select('id, first_name, last_name, patient_code, created_at')
-          .in_('id', patientIds);
+          .inFilter('id', patientIds);
 
       final patientsData = await patientQuery;
 
@@ -107,7 +107,7 @@ class ClinicianService {
             firstName: firstName,
             lastName: lastName,
             patientCode: patientCode,
-            status: ClinicianPatient._parseStatus(
+            status: ClinicianPatient.parseStatus(
                 relationship['status'] as String),
             lastActivity: DateTime.tryParse(
                 relationship['added_at'] as String? ?? ''),

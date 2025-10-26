@@ -83,7 +83,7 @@ class ClinicianPatient {
       id: json['id'] as String,
       clinicianId: json['clinician_id'] as String,
       patientId: json['patient_id'] as String,
-      status: _parseStatus(json['status'] as String),
+      status: parseStatus(json['status'] as String),
       addedAt: DateTime.parse(json['added_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -100,7 +100,7 @@ class ClinicianPatient {
     };
   }
 
-  static PatientStatus _parseStatus(String status) {
+  static PatientStatus parseStatus(String status) {
     switch (status.toLowerCase()) {
       case 'active':
         return PatientStatus.active;

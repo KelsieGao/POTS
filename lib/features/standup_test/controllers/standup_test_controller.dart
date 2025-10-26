@@ -48,7 +48,6 @@ class StandupTestController extends ChangeNotifier {
   int? get latestHeartRate => polarController.heartRate;
 
   String? errorMessage;
-  bool disposed = false;
 
   void next() {
     switch (step) {
@@ -87,7 +86,7 @@ class StandupTestController extends ChangeNotifier {
     
     // Auto-advance to standing countdown after 3 seconds
     Timer(const Duration(seconds: 3), () {
-      if (step == StandupStep.standPrep && !disposed) {
+      if (step == StandupStep.standPrep) {
         _startStandingCountdown1();
       }
     });
@@ -104,7 +103,7 @@ class StandupTestController extends ChangeNotifier {
     
     // Auto-advance after 3 seconds
     Timer(const Duration(seconds: 3), () {
-      if (step == StandupStep.standingEntry1 && !disposed) {
+      if (step == StandupStep.standingEntry1) {
         _startStandingCountdownTo3();
       }
     });
@@ -121,7 +120,7 @@ class StandupTestController extends ChangeNotifier {
     
     // Auto-advance after 3 seconds
     Timer(const Duration(seconds: 3), () {
-      if (step == StandupStep.standingEntry3 && !disposed) {
+      if (step == StandupStep.standingEntry3) {
         _startStandingCountdownTo5();
       }
     });
@@ -154,7 +153,7 @@ class StandupTestController extends ChangeNotifier {
     
     // Auto-advance after 5 seconds to give user time to read instructions
     Timer(const Duration(seconds: 5), () {
-      if (step == StandupStep.supineEntry && !disposed) {
+      if (step == StandupStep.supineEntry) {
         step = StandupStep.standPrep;
         notifyListeners();
       }
@@ -174,7 +173,7 @@ class StandupTestController extends ChangeNotifier {
     
     // Auto-advance after 5 seconds to give user time to read instructions
     Timer(const Duration(seconds: 5), () {
-      if (step == StandupStep.standingEntry1 && !disposed) {
+      if (step == StandupStep.standingEntry1) {
         _startStandingCountdownTo3();
       }
     });
@@ -193,7 +192,7 @@ class StandupTestController extends ChangeNotifier {
     
     // Auto-advance after 5 seconds to give user time to read instructions
     Timer(const Duration(seconds: 5), () {
-      if (step == StandupStep.standingEntry3 && !disposed) {
+      if (step == StandupStep.standingEntry3) {
         _startStandingCountdownTo5();
       }
     });
@@ -223,7 +222,7 @@ class StandupTestController extends ChangeNotifier {
     
     // Auto-submit after 5 seconds
     Timer(const Duration(seconds: 5), () {
-      if (step == StandupStep.summary && !disposed) {
+      if (step == StandupStep.summary) {
         submit();
       }
     });
@@ -240,7 +239,7 @@ class StandupTestController extends ChangeNotifier {
     notifyListeners();
     
     Timer(const Duration(seconds: 3), () {
-      if (step == StandupStep.summary && !disposed) {
+      if (step == StandupStep.summary) {
         submit();
       }
     });
@@ -307,7 +306,6 @@ class StandupTestController extends ChangeNotifier {
 
   @override
   void dispose() {
-    disposed = true;
     cancelCountdown();
     super.dispose();
   }

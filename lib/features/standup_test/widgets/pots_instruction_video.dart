@@ -207,7 +207,7 @@ class _PotsVideoPlaceholderState extends State<PotsVideoPlaceholder> {
     }
 
     return Container(
-      height: 160, // Further reduced to prevent overflow
+      height: 180, // Reduced from 200 to prevent overflow
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -237,34 +237,34 @@ class _PotsVideoPlaceholderState extends State<PotsVideoPlaceholder> {
               size: 36,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           
           // Title - matches your image exactly
           Text(
             'Daily Blood Pressure Guide for POTS',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w600,
               color: const Color(0xFF424242), // Dark gray from your image
-              fontSize: 16, // Further reduced
+              fontSize: 18, // Reduced from 20
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           
           // Description text - matches your image
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20), // Further reduced
+            padding: const EdgeInsets.symmetric(horizontal: 24), // Reduced from 32
             child: Text(
               'This guide shows you how to complete your daily POTS blood pressure test safely and correctly. Watch all steps first then start your test when you are ready.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: const Color(0xFF757575), // Lighter gray from your image
-                height: 1.2, // Further reduced
-                fontSize: 12, // Further reduced
+                height: 1.3, // Reduced from 1.4
+                fontSize: 13, // Reduced from 14
               ),
               textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           
           // Watch button
           ElevatedButton.icon(
