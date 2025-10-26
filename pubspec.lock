@@ -408,6 +408,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.2"
+  ihealth_sdk:
+    dependency: "direct main"
+    description:
+      name: ihealth_sdk
+      sha256: "98fdd51f9832e3c5e68171565285714370134f581b4a2babd9e09894bc44bce1"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.3"
   intl:
     dependency: "direct main"
     description:
