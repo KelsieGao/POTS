@@ -207,7 +207,9 @@ class _PotsVideoPlaceholderState extends State<PotsVideoPlaceholder> {
     }
 
     return Container(
-      height: 180, // Reduced from 200 to prevent overflow
+      constraints: const BoxConstraints(
+        maxHeight: 160, // Fixed max height to prevent overflow
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -220,75 +222,77 @@ class _PotsVideoPlaceholderState extends State<PotsVideoPlaceholder> {
           ),
         ],
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Heart icon in light blue circle
-          Container(
-            width: 72,
-            height: 72,
-            decoration: const BoxDecoration(
-              color: Color(0xFF87CEEB), // Light blue color from your image
-              shape: BoxShape.circle,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Heart icon in light blue circle
+            Container(
+              width: 60,
+              height: 60,
+              decoration: const BoxDecoration(
+                color: Color(0xFF87CEEB), // Light blue color from your image
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.favorite,
+                color: Colors.white,
+                size: 30,
+              ),
             ),
-            child: const Icon(
-              Icons.favorite,
-              color: Colors.white,
-              size: 36,
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Title - matches your image exactly
-          Text(
-            'Daily Blood Pressure Guide for POTS',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF424242), // Dark gray from your image
-              fontSize: 18, // Reduced from 20
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          
-          // Description text - matches your image
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24), // Reduced from 32
-            child: Text(
-              'This guide shows you how to complete your daily POTS blood pressure test safely and correctly. Watch all steps first then start your test when you are ready.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF757575), // Lighter gray from your image
-                height: 1.3, // Reduced from 1.4
-                fontSize: 13, // Reduced from 14
+            const SizedBox(height: 10),
+            
+            // Title - matches your image exactly
+            Text(
+              'Daily Blood Pressure Guide',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF424242), // Dark gray from your image
+                fontSize: 16,
               ),
               textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Watch button
-          ElevatedButton.icon(
-            onPressed: () {
-              setState(() {
-                _showVideo = true;
-              });
-            },
-            icon: const Icon(Icons.play_arrow, size: 20),
-            label: const Text(
-              'Watch Guide',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF87CEEB),
-              foregroundColor: Colors.white,
-              elevation: 2,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+            const SizedBox(height: 8),
+            
+            // Description text - matches your image
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Watch the guide to complete your test safely.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF757575), // Lighter gray from your image
+                  height: 1.2,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 10),
+            
+            // Watch button
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _showVideo = true;
+                });
+              },
+              icon: const Icon(Icons.play_arrow, size: 18),
+              label: const Text(
+                'Watch Guide',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF87CEEB),
+                foregroundColor: Colors.white,
+                elevation: 2,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
