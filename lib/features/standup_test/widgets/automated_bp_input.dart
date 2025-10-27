@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pots/features/ihealth/ihealth_bp_controller.dart';
+import 'package:pots/features/ihealth/ihealth_connection_sheet.dart';
 
 class AutomatedBpInput extends StatefulWidget {
   const AutomatedBpInput({
@@ -7,6 +9,7 @@ class AutomatedBpInput extends StatefulWidget {
     required this.instruction,
     required this.onSubmit,
     required this.latestHr,
+    this.ihealthBpController,
     this.autoSubmitDelay = const Duration(seconds: 2),
   });
 
@@ -14,6 +17,7 @@ class AutomatedBpInput extends StatefulWidget {
   final String instruction;
   final void Function(int systolic, int diastolic) onSubmit;
   final int? latestHr;
+  final IHealthBpController? ihealthBpController;
   final Duration autoSubmitDelay;
 
   @override
@@ -25,12 +29,82 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
   final _diastolicController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isAutoSubmitting = false;
-
+  bool _hasAutoSubmitted = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _systolicController.addListener(_onTextChanged);
+    _diastolicController.addListener(_onTextChanged);
+    if (widget.ihealthBpController != null) {
+      widget.ihealthBpController!.addListener(_handleBpUpdate);
+    }
+  }
+  
   @override
   void dispose() {
+    _systolicController.removeListener(_onTextChanged);
+    _diastolicController.removeListener(_onTextChanged);
     _systolicController.dispose();
     _diastolicController.dispose();
+    widget.ihealthBpController?.removeListener(_handleBpUpdate);
     super.dispose();
+  }
+  
+  void _onTextChanged() {
+    setState(() {
+      // Update state to enable/disable button based on text
+    });
+  }
+
+  void _handleBpUpdate() {
+    if (!mounted) return;
+    
+    // If using iHealth and we have a NEW reading, update and submit
+    if (widget.ihealthBpController != null && 
+        widget.ihealthBpController!.hasLatestReading &&
+        !_hasAutoSubmitted) {
+      final systolic = widget.ihealthBpController!.latestSystolic;
+      final diastolic = widget.ihealthBpController!.latestDiastolic;
+      
+      if (systolic != null && diastolic != null) {
+        setState(() {
+          _systolicController.text = systolic.toString();
+          _diastolicController.text = diastolic.toString();
+        });
+        
+        // Auto-submit when we get a device reading
+        _autoSubmitDeviceReading();
+        _hasAutoSubmitted = true;
+      }
+    }
+    
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _autoSubmitDeviceReading() {
+    if (_isAutoSubmitting) return;
+    
+    final systolic = _systolicController.text.trim();
+    final diastolic = _diastolicController.text.trim();
+    
+    if (systolic.isNotEmpty && diastolic.isNotEmpty) {
+      // Validate the inputs
+      if (_validateInt(systolic) == null && _validateInt(diastolic) == null) {
+        setState(() {
+          _isAutoSubmitting = true;
+        });
+        
+        // Auto-submit after delay when reading comes from device
+        Future.delayed(widget.autoSubmitDelay, () {
+          if (mounted && _isAutoSubmitting) {
+            widget.onSubmit(int.parse(systolic), int.parse(diastolic));
+          }
+        });
+      }
+    }
   }
 
   void _checkAndAutoSubmit() {
@@ -56,6 +130,8 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
     }
   }
 
+  // Removed auto-submit functionality - now requires manual button press
+
   @override
   Widget build(BuildContext context) {
     return Form(
@@ -74,6 +150,11 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
           ),
           const SizedBox(height: 24),
           
+          // iHealth Device Status (disabled - use manual entry)
+          // if (widget.ihealthBpController != null) _buildIHealthStatus(context),
+          
+          const SizedBox(height: 8),
+          
           // BP Input Fields
           Row(
             children: [
@@ -86,8 +167,11 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
                     suffixText: 'mmHg',
                   ),
                   keyboardType: TextInputType.number,
-                  onChanged: (_) => _checkAndAutoSubmit(),
                   validator: _validateInt,
+                  textInputAction: TextInputAction.next,
+                  onEditingComplete: () {
+                    FocusScope.of(context).nextFocus();
+                  },
                 ),
               ),
               const SizedBox(width: 16),
@@ -100,8 +184,8 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
                     suffixText: 'mmHg',
                   ),
                   keyboardType: TextInputType.number,
-                  onChanged: (_) => _checkAndAutoSubmit(),
                   validator: _validateInt,
+                  textInputAction: TextInputAction.done,
                 ),
               ),
             ],
@@ -137,75 +221,22 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
           
           const SizedBox(height: 16),
           
-          // Manual Submit Button (as backup)
-          if (_isAutoSubmitting)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.timer, color: Colors.green),
-                  const SizedBox(width: 8),
-                  const Text('Auto-submitting in a moment...'),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () {
+          // Manual Submit Button - ALWAYS required
+          FilledButton(
+            onPressed: _systolicController.text.isNotEmpty && _diastolicController.text.isNotEmpty
+                ? () {
+                    if (_formKey.currentState?.validate() ?? false) {
                       final systolic = _systolicController.text.trim();
                       final diastolic = _diastolicController.text.trim();
-                      if (_formKey.currentState?.validate() ?? false) {
-                        widget.onSubmit(int.parse(systolic), int.parse(diastolic));
-                      }
-                    },
-                    child: const Text('Submit Now'),
-                  ),
-                ],
-              ),
-            )
-          else if (_systolicController.text.isNotEmpty && _diastolicController.text.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.green),
-                  const SizedBox(width: 8),
-                  const Text('Ready - will auto-continue shortly'),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: () {
-                      final systolic = _systolicController.text.trim();
-                      final diastolic = _diastolicController.text.trim();
-                      if (_formKey.currentState?.validate() ?? false) {
-                        widget.onSubmit(int.parse(systolic), int.parse(diastolic));
-                      }
-                    },
-                    child: const Text('Submit Now'),
-                  ),
-                ],
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline),
-                  SizedBox(width: 8),
-                  Text('Enter both values to continue automatically'),
-                ],
-              ),
+                      widget.onSubmit(int.parse(systolic), int.parse(diastolic));
+                    }
+                  }
+                : null,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
+            child: const Text('Confirm & Continue'),
+          ),
         ],
       ),
     );
@@ -278,5 +309,67 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
       return 'Invalid range';
     }
     return null;
+  }
+
+  Widget _buildIHealthStatus(BuildContext context) {
+    final controller = widget.ihealthBpController!;
+    final status = controller.status;
+    final isConnected = controller.isConnected;
+
+    Color color;
+    IconData icon;
+    String text;
+
+    if (isConnected && controller.hasLatestReading) {
+      color = Colors.green.shade700;
+      icon = Icons.check_circle;
+      text = 'iHealth connected - Reading: ${controller.latestSystolic}/${controller.latestDiastolic} mmHg';
+    } else if (isConnected) {
+      color = Colors.blue.shade700;
+      icon = Icons.bluetooth_connected;
+      text = 'iHealth connected - Waiting for reading...';
+    } else if (status == IHealthBpConnectionStatus.connecting) {
+      color = Colors.orange.shade700;
+      icon = Icons.bluetooth_searching;
+      text = 'Connecting to iHealth device...';
+    } else if (controller.errorMessage != null) {
+      color = Colors.red.shade700;
+      icon = Icons.error;
+      text = 'iHealth: ${controller.errorMessage}';
+    } else if (status == IHealthBpConnectionStatus.disconnected) {
+      color = Colors.grey.shade700;
+      icon = Icons.edit;
+      text = 'Enter BP readings manually';
+    } else {
+      color = Colors.blue.shade700;
+      icon = Icons.bloodtype;
+      text = 'Waiting for BP reading...';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
+          ),
+          // iHealth device connection temporarily disabled due to plugin issues
+          // Users can manually enter BP readings
+        ],
+      ),
+    );
   }
 }

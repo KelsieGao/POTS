@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'core/services/supabase_service.dart';
 import 'features/polar/polar_heart_rate_page.dart';
-//import 'features/clinician/clinician_code_entry_page.dart';
-import 'clinician_dashboard.dart';
+import 'features/auth/sign_in_page.dart';
+import 'features/auth/sign_up_page.dart';
+import 'features/auth/patient_profile_completion_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +25,12 @@ class PotsApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const LaunchScreen(),
+      routes: {
+        '/sign-in': (_) => const SignInPage(),
+        '/sign-up': (_) => const SignUpPage(),
+        '/home': (_) => const PolarHeartRatePage(),
+        '/patient-profile-complete': (_) => const PatientProfileCompletionPage(),
+      },
     );
   }
 }
@@ -46,12 +53,13 @@ class LaunchScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+          child: SingleChildScrollView(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -84,14 +92,14 @@ class LaunchScreen extends StatelessWidget {
                   const SizedBox(height: 64),
                   _buildOptionCard(
                     context,
-                    title: 'Patient',
-                    subtitle: 'Track your symptoms and tests',
-                    icon: Icons.person,
+                    title: 'Sign In',
+                    subtitle: 'Sign in to your account',
+                    icon: Icons.login,
                     color: const Color(0xFF20B2AA),
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const PolarHeartRatePage(),
+                          builder: (_) => const SignInPage(),
                         ),
                       );
                     },
@@ -99,27 +107,28 @@ class LaunchScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   _buildOptionCard(
                     context,
-                    title: 'Clinician',
-                    subtitle: 'Access patient dashboards',
-                    icon: Icons.verified_user,
+                    title: 'Create Account',
+                    subtitle: 'Sign up as a new patient',
+                    icon: Icons.person_add,
                     color: const Color(0xFF2196F3),
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const DashboardScreen(),
+                          builder: (_) => const SignUpPage(),
                         ),
                       );
                     },
                   ),
-                  const SizedBox(height: 32),
-                  Text(
-                    'Select your role to continue',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withOpacity(0.7),
+                    const SizedBox(height: 32),
+                    Text(
+                      'Tap to continue',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.7),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:ihealth_sdk/ihealth_sdk.dart';
+import 'package:ihealth_hr/ihealth_hr.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// Service to handle iHealth KN-550BT Blood Pressure Monitor integration
 class IHealthService {
@@ -7,7 +8,7 @@ class IHealthService {
   factory IHealthService() => _instance;
   IHealthService._internal();
 
-  final _ihealthPlugin = IhealthSdk();
+  // ihealth_hr package uses static methods
   
   // Stream controllers for BP data
   final _bpStreamController = StreamController<BloodPressureReading>.broadcast();
@@ -20,19 +21,89 @@ class IHealthService {
   Future<void> initialize() async {
     try {
       // Initialize the plugin
-      // Note: You may need to add app credentials if the SDK requires them
+      // Note: ihealth_hr may not need explicit initialization
     } catch (e) {
       print('Error initializing iHealth SDK: $e');
     }
   }
 
+  /// Request necessary permissions for Bluetooth scanning
+  Future<bool> requestPermissions() async {
+    try {
+      // Request Bluetooth and Location permissions
+      final bluetoothScan = await Permission.bluetoothScan.request();
+      final bluetoothConnect = await Permission.bluetoothConnect.request();
+      final location = await Permission.location.request();
+      
+      return bluetoothScan.isGranted && 
+             bluetoothConnect.isGranted && 
+             location.isGranted;
+    } catch (e) {
+      print('Error requesting permissions: $e');
+      return false;
+    }
+  }
+
+  StreamSubscription? _deviceStreamSubscription;
+  final _discoveredDevices = <BluetoothDevice>[];
+
   /// Scan for iHealth KN-550BT devices
   Future<List<BluetoothDevice>> scanForDevices() async {
     try {
-      final devices = await _ihealthPlugin.scanForDevices();
-      return devices;
+      // Request permissions first
+      final hasPermissions = await requestPermissions();
+      if (!hasPermissions) {
+        throw Exception('Bluetooth and Location permissions are required');
+      }
+      
+      // Clear previous results
+      _discoveredDevices.clear();
+      
+      // Cancel existing stream subscription
+      await _deviceStreamSubscription?.cancel();
+      
+      // Listen to device stream to collect discovered devices
+      _deviceStreamSubscription = IhealthHrPlugin.deviceStatusStream.listen((event) {
+        print('Device event received: $event');
+        
+        if (event is Map) {
+          // Parse device discovery events
+          // The actual format needs to be verified with the device
+          final deviceName = event['name']?.toString() ?? 'Unknown';
+          final deviceAddress = event['address']?.toString() ?? '';
+          
+          if (deviceAddress.isNotEmpty) {
+            final device = BluetoothDevice(
+              name: deviceName,
+              address: deviceAddress,
+              rssi: (event['rssi'] as int?) ?? 0,
+            );
+            // Add to discovered devices if not already present
+            if (!_discoveredDevices.any((d) => d.address == deviceAddress)) {
+              _discoveredDevices.add(device);
+            }
+          }
+        }
+      });
+      
+      // Start scanning using the package's static method
+      await IhealthHrPlugin.startScan();
+      
+      // Wait a bit for devices to be discovered
+      await Future.delayed(const Duration(seconds: 5));
+      
+      // Stop scanning
+      await IhealthHrPlugin.stopScan();
+      
+      // Cancel stream subscription
+      await _deviceStreamSubscription?.cancel();
+      _deviceStreamSubscription = null;
+      
+      return List.from(_discoveredDevices);
     } catch (e) {
       print('Error scanning for devices: $e');
+      await _deviceStreamSubscription?.cancel();
+      _deviceStreamSubscription = null;
       return [];
     }
   }
@@ -40,10 +111,11 @@ class IHealthService {
   /// Connect to a specific device
   Future<bool> connectDevice(String deviceAddress) async {
     try {
-      await _ihealthPlugin.connectDevice(deviceAddress);
+      // Note: The package API needs to be verified with actual device testing
+      // This is a placeholder implementation
       _isConnected = true;
       
-      // Listen for BP readings
+      // Setup listener for BP readings from the device
       _setupBPListener();
       
       return true;
@@ -56,17 +128,26 @@ class IHealthService {
 
   /// Setup listener for BP readings
   void _setupBPListener() {
-    // The iHealth SDK should provide a stream or callback for BP readings
-    // This is a placeholder - adjust based on actual SDK API
-    _ihealthPlugin.onBloodPressureReading.listen((reading) {
-      _bpStreamController.add(reading);
+    // Listen for blood pressure readings from device stream
+    // Note: This needs to be tested with actual device to confirm event format
+    IhealthHrPlugin.deviceStatusStream.listen((event) {
+      if (event is Map) {
+        // Parse device event data
+        // Adjust based on actual event format
+        final reading = BloodPressureReading(
+          systolic: event['systolic'] ?? 0,
+          diastolic: event['diastolic'] ?? 0,
+          heartRate: event['heartRate'] ?? 0,
+        );
+        _bpStreamController.add(reading);
+      }
     });
   }
 
   /// Disconnect from the device
   Future<void> disconnect() async {
     try {
-      await _ihealthPlugin.disconnect();
+      await IhealthHrPlugin.stopScan();
       _isConnected = false;
     } catch (e) {
       print('Error disconnecting: $e');
@@ -76,7 +157,8 @@ class IHealthService {
   /// Get device battery level
   Future<int?> getBatteryLevel() async {
     try {
-      return await _ihealthPlugin.getBatteryLevel();
+      // Note: Battery level method needs to be added to the package
+      return null;
     } catch (e) {
       print('Error getting battery level: $e');
       return null;

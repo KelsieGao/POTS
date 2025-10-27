@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:pots/features/polar/polar_heart_rate_controller.dart';
+import 'package:pots/features/ihealth/ihealth_bp_controller.dart';
 
 import '../models/standup_test_data.dart';
 import '../services/standup_test_service.dart';
@@ -27,12 +28,14 @@ enum StandupStep {
 class StandupTestController extends ChangeNotifier {
   StandupTestController({
     required this.polarController,
+    required this.ihealthBpController,
     required this.patientId,
     this.demoMode = true,
     StandupTestService? service,
   }) : _service = service ?? StandupTestService();
 
   final PolarHeartRateController polarController;
+  final IHealthBpController ihealthBpController;
   final String patientId;
   final bool demoMode;
   final StandupTestService _service;
@@ -54,18 +57,8 @@ class StandupTestController extends ChangeNotifier {
       case StandupStep.intro:
         _startSupineCountdown();
         break;
-      case StandupStep.supineEntry:
-        step = StandupStep.standPrep;
-        notifyListeners();
-        break;
       case StandupStep.standPrep:
         _startStandingCountdown1();
-        break;
-      case StandupStep.standingEntry1:
-        _startStandingCountdownTo3();
-        break;
-      case StandupStep.standingEntry3:
-        _startStandingCountdownTo5();
         break;
       case StandupStep.summary:
         submit();
@@ -75,55 +68,45 @@ class StandupTestController extends ChangeNotifier {
     }
   }
 
-  void setSupineBp({required int systolic, required int diastolic}) {
-    data.supineSystolic = systolic;
-    data.supineDiastolic = diastolic;
+  void setSupineBp({int? systolic, int? diastolic}) {
+    // Only set values if they are provided (not null and > 0)
+    data.supineSystolic = systolic != null && systolic > 0 ? systolic : null;
+    data.supineDiastolic = diastolic != null && diastolic > 0 ? diastolic : null;
     data.supineHr = latestHeartRate;
+    
+    debugPrint('Supine BP set: ${data.supineSystolic}/${data.supineDiastolic}');
     
     // Automatically advance to stand prep after BP entry
     step = StandupStep.standPrep;
     notifyListeners();
     
-    // Auto-advance to standing countdown after 3 seconds
-    Timer(const Duration(seconds: 3), () {
-      if (step == StandupStep.standPrep) {
-        _startStandingCountdown1();
-      }
-    });
+    // NO auto-advance - user must manually proceed
   }
 
-  void setStanding1Min({required int systolic, required int diastolic}) {
-    data.standing1MinSystolic = systolic;
-    data.standing1MinDiastolic = diastolic;
+  void setStanding1Min({int? systolic, int? diastolic}) {
+    // Only set values if they are provided (not null and > 0)
+    data.standing1MinSystolic = systolic != null && systolic > 0 ? systolic : null;
+    data.standing1MinDiastolic = diastolic != null && diastolic > 0 ? diastolic : null;
     data.standing1MinHr = latestHeartRate;
     
-    // Automatically advance to next countdown
-    step = StandupStep.standingEntry1;
-    notifyListeners();
+    debugPrint('Standing 1min BP set: ${data.standing1MinSystolic}/${data.standing1MinDiastolic}');
     
-    // Auto-advance after 3 seconds
-    Timer(const Duration(seconds: 3), () {
-      if (step == StandupStep.standingEntry1) {
-        _startStandingCountdownTo3();
-      }
-    });
+    // Show a "ready" prompt - user clicks continue button
+    step = StandupStep.standingCountdownTo3;
+    notifyListeners();
   }
 
-  void setStanding3Min({required int systolic, required int diastolic}) {
-    data.standing3MinSystolic = systolic;
-    data.standing3MinDiastolic = diastolic;
+  void setStanding3Min({int? systolic, int? diastolic}) {
+    // Only set values if they are provided (not null and > 0)
+    data.standing3MinSystolic = systolic != null && systolic > 0 ? systolic : null;
+    data.standing3MinDiastolic = diastolic != null && diastolic > 0 ? diastolic : null;
     data.standing3MinHr = latestHeartRate;
     
-    // Automatically advance to next countdown
-    step = StandupStep.standingEntry3;
-    notifyListeners();
+    debugPrint('Standing 3min BP set: ${data.standing3MinSystolic}/${data.standing3MinDiastolic}');
     
-    // Auto-advance after 3 seconds
-    Timer(const Duration(seconds: 3), () {
-      if (step == StandupStep.standingEntry3) {
-        _startStandingCountdownTo5();
-      }
-    });
+    // Show a "ready" prompt - user clicks continue button
+    step = StandupStep.standingCountdownTo5;
+    notifyListeners();
   }
 
   void cancelCountdown() {
@@ -151,13 +134,7 @@ class StandupTestController extends ChangeNotifier {
     step = StandupStep.supineEntry;
     notifyListeners();
     
-    // Auto-advance after 5 seconds to give user time to read instructions
-    Timer(const Duration(seconds: 5), () {
-      if (step == StandupStep.supineEntry) {
-        step = StandupStep.standPrep;
-        notifyListeners();
-      }
-    });
+    // NO auto-advance - user must click "Confirm & Continue" on BP input
   }
 
   void _startStandingCountdown1() {
@@ -171,17 +148,16 @@ class StandupTestController extends ChangeNotifier {
     step = StandupStep.standingEntry1;
     notifyListeners();
     
-    // Auto-advance after 5 seconds to give user time to read instructions
-    Timer(const Duration(seconds: 5), () {
-      if (step == StandupStep.standingEntry1) {
-        _startStandingCountdownTo3();
-      }
-    });
+    // NO auto-advance - user must click "Confirm & Continue" on BP input
   }
 
   void _startStandingCountdownTo3() {
     step = StandupStep.standingCountdownTo3;
     _startTimer(const Duration(minutes: 2), _completeStanding3Countdown);
+  }
+  
+  void startStandingCountdownTo3() {
+    _startStandingCountdownTo3();
   }
 
   void _completeStanding3Countdown() {
@@ -190,17 +166,16 @@ class StandupTestController extends ChangeNotifier {
     step = StandupStep.standingEntry3;
     notifyListeners();
     
-    // Auto-advance after 5 seconds to give user time to read instructions
-    Timer(const Duration(seconds: 5), () {
-      if (step == StandupStep.standingEntry3) {
-        _startStandingCountdownTo5();
-      }
-    });
+    // NO auto-advance - user must click "Confirm & Continue" on BP input
   }
 
   void _startStandingCountdownTo5() {
     step = StandupStep.standingCountdownTo5;
     _startTimer(const Duration(minutes: 2), _completeStanding5Countdown);
+  }
+  
+  void startStandingCountdownTo5() {
+    _startStandingCountdownTo5();
   }
 
   void _completeStanding5Countdown() {
@@ -220,18 +195,17 @@ class StandupTestController extends ChangeNotifier {
     step = StandupStep.summary;
     notifyListeners();
     
-    // Auto-submit after 5 seconds
-    Timer(const Duration(seconds: 5), () {
-      if (step == StandupStep.summary) {
-        submit();
-      }
-    });
+    // NO auto-submit - user must manually submit
   }
   
   // Add method for final BP reading (optional 10-minute reading)
-  void setStanding10Min({required int systolic, required int diastolic}) {
-    data.standing10MinSystolic = systolic;
-    data.standing10MinDiastolic = diastolic;
+  void setStanding10Min({int? systolic, int? diastolic}) {
+    // Use values from iHealth controller if provided, otherwise use passed values
+    final sys = systolic ?? ihealthBpController.latestSystolic ?? 0;
+    final dia = diastolic ?? ihealthBpController.latestDiastolic ?? 0;
+    
+    data.standing10MinSystolic = sys;
+    data.standing10MinDiastolic = dia;
     data.standing10MinHr = latestHeartRate;
     
     // Automatically submit after final reading

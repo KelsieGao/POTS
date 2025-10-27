@@ -53,5 +53,16 @@
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>pots</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.kelsie.potsive</string>
+		</dict>
+	</array>
 </dict>
 </plist>

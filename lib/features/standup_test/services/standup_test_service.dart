@@ -15,29 +15,52 @@ class StandupTestService {
     required String patientId,
     required StandupTestData data,
   }) async {
-    final now = DateTime.now();
+    try {
+      final now = DateTime.now();
 
-    final payload = StandupTests.insert(
-      patientId: patientId,
-      testDate: DateTime(now.year, now.month, now.day),
-      testTime: now,
-      supineHr: data.supineHr,
-      supineSystolic: data.supineSystolic,
-      supineDiastolic: data.supineDiastolic,
-      supineDurationMinutes: data.supineDurationMinutes,
-      standing1minHr: data.standing1MinHr,
-      standing1minSystolic: data.standing1MinSystolic,
-      standing1minDiastolic: data.standing1MinDiastolic,
-      standing3minHr: data.standing3MinHr,
-      standing3minSystolic: data.standing3MinSystolic,
-      standing3minDiastolic: data.standing3MinDiastolic,
-      standing5minHr: data.standing5MinHr,
-      standing10minHr: data.standing10MinHr,
-      notes: data.notes,
-      createdAt: now,
-    );
+      // Create the payload but filter out generated columns
+      final fullPayload = StandupTests.insert(
+        patientId: patientId,
+        testDate: DateTime(now.year, now.month, now.day),
+        testTime: now,
+        supineHr: data.supineHr,
+        supineSystolic: data.supineSystolic,
+        supineDiastolic: data.supineDiastolic,
+        supineDurationMinutes: data.supineDurationMinutes,
+        standing1minHr: data.standing1MinHr,
+        standing1minSystolic: data.standing1MinSystolic,
+        standing1minDiastolic: data.standing1MinDiastolic,
+        standing3minHr: data.standing3MinHr,
+        standing3minSystolic: data.standing3MinSystolic,
+        standing3minDiastolic: data.standing3MinDiastolic,
+        standing5minHr: data.standing5MinHr,
+        standing10minHr: data.standing10MinHr,
+        notes: data.notes,
+        createdAt: now,
+      );
 
-    await _client.from(StandupTests.table_name).insert(payload);
+      // Remove generated columns that shouldn't be inserted
+      final payload = Map<String, dynamic>.from(fullPayload)
+        ..remove('hr_increase_1min')
+        ..remove('hr_increase_3min')
+        ..remove('hr_increase_5min')
+        ..remove('hr_increase_10min')
+        ..remove('systolic_drop_1min')
+        ..remove('systolic_drop_3min')
+        ..remove('test_result')
+        ..remove('pots_severity');
+
+      print('Submitting test with data:');
+      print('  Supine BP: ${data.supineSystolic}/${data.supineDiastolic}');
+      print('  1min BP: ${data.standing1MinSystolic}/${data.standing1MinDiastolic}');
+      print('  3min BP: ${data.standing3MinSystolic}/${data.standing3MinDiastolic}');
+
+      await _client.from(StandupTests.table_name).insert(payload);
+      print('Test saved successfully!');
+    } catch (e) {
+      print('Error submitting standup test: $e');
+      rethrow;
+    }
   }
 
   Future<List<StandupTests>> getTestHistory({

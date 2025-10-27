@@ -31,6 +31,7 @@ CREATE TABLE symptom_logs (
     time_of_day TEXT,
     activity_type TEXT,
     other_details TEXT,
+    is_pots_episode BOOLEAN,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

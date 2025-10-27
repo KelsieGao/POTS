@@ -23,8 +23,18 @@ class _PotsInstructionVideoState extends State<PotsInstructionVideo> {
 
   Future<void> _initializeVideo() async {
     try {
-      // Use a more reliable video source for testing
-      const String videoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+      // Option 1: If uploaded to YouTube, use YouTube URL
+      // const String videoUrl = 'https://www.youtube.com/watch?v=YOUR_VIDEO_ID';
+      
+      // Option 2: Host on your own server or cloud storage (AWS S3, Firebase, etc.)
+      // const String videoUrl = 'https://your-server.com/path/to/video.mp4';
+      
+      // Option 3: Try Google Drive direct link (make file publicly shareable first)
+      const String fileId = '1BbrfCcKuGpjCW4voZ9ojmFn-pVa3JFbi';
+      const String videoUrl = 'https://drive.google.com/uc?export=download&id=$fileId';
+      
+      // For testing: Use a sample video URL that definitely works
+      // const String videoUrl = 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4';
       
       _videoController = VideoPlayerController.networkUrl(
         Uri.parse(videoUrl),

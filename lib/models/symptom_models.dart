@@ -9,6 +9,7 @@ class SymptomLog {
   final String? timeOfDay;
   final String? activityType;
   final String? otherDetails;
+  final bool? isPotsEpisode;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -21,6 +22,7 @@ class SymptomLog {
     this.timeOfDay,
     this.activityType,
     this.otherDetails,
+    this.isPotsEpisode,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -35,6 +37,7 @@ class SymptomLog {
       timeOfDay: json['time_of_day'] as String?,
       activityType: json['activity_type'] as String?,
       otherDetails: json['other_details'] as String?,
+      isPotsEpisode: json['is_pots_episode'] as bool?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -50,6 +53,7 @@ class SymptomLog {
       'time_of_day': timeOfDay,
       'activity_type': activityType,
       'other_details': otherDetails,
+      'is_pots_episode': isPotsEpisode,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -64,6 +68,7 @@ class SymptomLog {
     String? timeOfDay,
     String? activityType,
     String? otherDetails,
+    bool? isPotsEpisode,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -76,6 +81,7 @@ class SymptomLog {
       timeOfDay: timeOfDay ?? this.timeOfDay,
       activityType: activityType ?? this.activityType,
       otherDetails: otherDetails ?? this.otherDetails,
+      isPotsEpisode: isPotsEpisode ?? this.isPotsEpisode,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

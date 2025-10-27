@@ -22,6 +22,7 @@ class _SymptomLoggingPageState extends State<SymptomLoggingPage> {
   final TextEditingController _timeOfDayController = TextEditingController();
   final TextEditingController _activityController = TextEditingController();
   final TextEditingController _detailsController = TextEditingController();
+  bool _isPotsEpisode = false;
   bool _isLoading = false;
 
   @override
@@ -298,57 +299,83 @@ class _SymptomLoggingPageState extends State<SymptomLoggingPage> {
               ),
             ),
             
+            const SizedBox(height: 16),
+            
+            // POTS Episode Toggle
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE0E0E0)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.accessibility_new,
+                    color: Color(0xFF20B2AA),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Do you think this is a POTS episode?',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF2C3E50),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Symptoms due to postural changes',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: const Color(0xFF7F8C8D),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _isPotsEpisode,
+                    onChanged: (value) {
+                      setState(() {
+                        _isPotsEpisode = value;
+                      });
+                    },
+                    activeColor: const Color(0xFF20B2AA),
+                  ),
+                ],
+              ),
+            ),
+            
             const SizedBox(height: 32),
             
-            // Action Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _logSymptoms,
-                    icon: const Icon(Icons.favorite, color: Colors.white),
-                    label: const Text(
-                      'Log Symptoms',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF27AE60),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
-                  ),
+            // Action Button
+            ElevatedButton.icon(
+              onPressed: _isLoading ? null : _logSymptoms,
+              icon: const Icon(Icons.favorite, color: Colors.white),
+              label: const Text(
+                'Log Symptoms',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _startEpisodeTracking,
-                    icon: const Icon(Icons.timer, color: Colors.white),
-                    label: const Text(
-                      'Start Episode Tracking',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF3498DB),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
-                  ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF27AE60),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ],
+                elevation: 2,
+                minimumSize: const Size(double.infinity, 56),
+              ),
             ),
             
             const SizedBox(height: 24),
@@ -438,6 +465,7 @@ class _SymptomLoggingPageState extends State<SymptomLoggingPage> {
         otherDetails: _detailsController.text.trim().isNotEmpty 
             ? _detailsController.text.trim() 
             : null,
+        isPotsEpisode: _isPotsEpisode,
         createdAt: now,
         updatedAt: now,
       );
@@ -456,12 +484,6 @@ class _SymptomLoggingPageState extends State<SymptomLoggingPage> {
         _isLoading = false;
       });
     }
-  }
-
-  Future<void> _startEpisodeTracking() async {
-    // For now, just log symptoms and show a message about episode tracking
-    await _logSymptoms();
-    _showSnackBar('Episode tracking started! Monitor your symptoms over time.');
   }
 
   void _showSnackBar(String message, {bool isError = false}) {

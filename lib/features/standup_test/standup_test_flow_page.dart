@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:pots/features/polar/polar_heart_rate_controller.dart';
+import 'package:pots/features/ihealth/ihealth_bp_controller.dart';
 import 'package:pots/features/standup_test/models/standup_test_data.dart';
 import 'package:pots/features/standup_test/pages/safety_acknowledgment_page.dart';
 import 'package:pots/features/standup_test/services/safety_service.dart';
@@ -15,11 +16,13 @@ class StandupTestFlowPage extends StatefulWidget {
   const StandupTestFlowPage({
     super.key,
     required this.polarController,
+    required this.ihealthBpController,
     required this.patientId,
     this.demoMode = true,
   });
 
   final PolarHeartRateController polarController;
+  final IHealthBpController ihealthBpController;
   final String patientId;
   final bool demoMode;
 
@@ -39,12 +42,23 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
     super.initState();
     _controller = StandupTestController(
       polarController: widget.polarController,
+      ihealthBpController: widget.ihealthBpController,
       patientId: widget.patientId,
       demoMode: widget.demoMode,
     )..addListener(_handleUpdate);
     
+    // Initialize iHealth connection
+    _initializeIHealth();
+    
     // Check for safety acknowledgment before starting
     _checkSafetyAcknowledgment();
+  }
+  
+  Future<void> _initializeIHealth() async {
+    // Connect to iHealth device if known
+    await widget.ihealthBpController.connectIfKnown();
+    // Update patient ID
+    widget.ihealthBpController.updatePatientId(widget.patientId);
   }
 
   void _handleUpdate() {
@@ -281,13 +295,13 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
             _controller.setSupineBp(systolic: systolic, diastolic: diastolic);
           },
           latestHr: _controller.latestHeartRate,
+          ihealthBpController: widget.ihealthBpController,
         );
       case StandupStep.standPrep:
-        return _AutomaticInstructionStep(
-          title: 'Stand Up Now',
-          description: 'Please stand up carefully. You may lean on a wall if needed. Keep still while standing.',
-          countdownDuration: const Duration(seconds: 10),
-          onComplete: _controller.next,
+        return _StandPrepStep(
+          onNext: () {
+            _controller.next();
+          },
         );
       case StandupStep.standingCountdown1:
         return _CountdownStep(
@@ -310,8 +324,19 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
             );
           },
           latestHr: _controller.latestHeartRate,
+          ihealthBpController: widget.ihealthBpController,
         );
       case StandupStep.standingCountdownTo3:
+        // Check if we just finished BP input - show continue prompt instead
+        if (!_controller.isCountdownActive) {
+          return _NextStepPrompt(
+            title: 'BP Recorded',
+            description: 'Continue to next countdown.',
+            onNext: () {
+              _controller.startStandingCountdownTo3();
+            },
+          );
+        }
         return _CountdownStep(
           title: 'Standing · up to 3 minutes',
           description:
@@ -333,8 +358,19 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
             );
           },
           latestHr: _controller.latestHeartRate,
+          ihealthBpController: widget.ihealthBpController,
         );
       case StandupStep.standingCountdownTo5:
+        // Check if we just finished BP input - show continue prompt instead
+        if (!_controller.isCountdownActive) {
+          return _NextStepPrompt(
+            title: 'BP Recorded',
+            description: 'Continue to next countdown.',
+            onNext: () {
+              _controller.startStandingCountdownTo5();
+            },
+          );
+        }
         return _CountdownStep(
           title: 'Standing · up to 5 minutes',
           description:
@@ -359,7 +395,10 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
       case StandupStep.summary:
         return _SummaryStep(
           data: _controller.data,
-          onSubmit: _controller.submit,
+          onSubmit: () {
+            // Notes are saved automatically in _SummaryStepState._submit
+            _controller.submit();
+          },
         );
       case StandupStep.submitting:
         return const Center(child: CircularProgressIndicator());
@@ -898,14 +937,47 @@ class _AutomaticInstructionStepState extends State<_AutomaticInstructionStep> {
   }
 }
 
-class _SummaryStep extends StatelessWidget {
+class _SummaryStep extends StatefulWidget {
   const _SummaryStep({required this.data, required this.onSubmit});
 
   final StandupTestData data;
   final VoidCallback onSubmit;
 
   @override
+  State<_SummaryStep> createState() => _SummaryStepState();
+}
+
+class _SummaryStepState extends State<_SummaryStep> {
+  late final TextEditingController _notesController;
+
+  @override
+  void initState() {
+    super.initState();
+    _notesController = TextEditingController(text: widget.data.notes ?? '');
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    // Save notes to data before submitting
+    widget.data.notes = _notesController.text.trim().isEmpty 
+        ? null 
+        : _notesController.text.trim();
+    widget.onSubmit();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Debug print to see what data we have
+    print('Summary data:');
+    print('  Supine: ${widget.data.supineSystolic}/${widget.data.supineDiastolic}');
+    print('  1min: ${widget.data.standing1MinSystolic}/${widget.data.standing1MinDiastolic}');
+    print('  3min: ${widget.data.standing3MinSystolic}/${widget.data.standing3MinDiastolic}');
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -919,33 +991,38 @@ class _SummaryStep extends StatelessWidget {
             children: [
               _SummaryTile(
                 title: 'Supine',
-                bp: _bp(data.supineSystolic, data.supineDiastolic),
-                hr: data.supineHr,
+                bp: _bp(widget.data.supineSystolic, widget.data.supineDiastolic),
+                hr: widget.data.supineHr,
               ),
               _SummaryTile(
                 title: 'Standing · 1 min',
-                bp: _bp(data.standing1MinSystolic, data.standing1MinDiastolic),
-                hr: data.standing1MinHr,
+                bp: _bp(widget.data.standing1MinSystolic, widget.data.standing1MinDiastolic),
+                hr: widget.data.standing1MinHr,
               ),
               _SummaryTile(
                 title: 'Standing · 3 min',
-                bp: _bp(data.standing3MinSystolic, data.standing3MinDiastolic),
-                hr: data.standing3MinHr,
+                bp: _bp(widget.data.standing3MinSystolic, widget.data.standing3MinDiastolic),
+                hr: widget.data.standing3MinHr,
               ),
               _SummaryTile(
                 title: 'Standing · 5 min (HR)',
                 bp: null,
-                hr: data.standing5MinHr,
+                hr: widget.data.standing5MinHr,
               ),
               _SummaryTile(
                 title: 'Standing · 10 min (HR)',
                 bp: null,
-                hr: data.standing10MinHr,
+                hr: widget.data.standing10MinHr,
               ),
+              const SizedBox(height: 24),
+              _NotesSection(controller: _notesController),
             ],
           ),
         ),
-        FilledButton(onPressed: onSubmit, child: const Text('Submit test')),
+        FilledButton(
+          onPressed: _submit, 
+          child: const Text('Submit test'),
+        ),
       ],
     );
   }
@@ -953,6 +1030,38 @@ class _SummaryStep extends StatelessWidget {
   String? _bp(int? systolic, int? diastolic) {
     if (systolic == null || diastolic == null) return null;
     return '$systolic / $diastolic mmHg';
+  }
+}
+
+class _NotesSection extends StatelessWidget {
+  const _NotesSection({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Notes (Optional)',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          maxLines: 4,
+          decoration: InputDecoration(
+            hintText: 'Add any notes about this test...',
+            border: OutlineInputBorder(),
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -965,16 +1074,46 @@ class _SummaryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final subtitle = <String>[];
-    if (bp != null) subtitle.add(bp!);
-    if (hr != null) subtitle.add('$hr bpm');
-
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(title),
-      subtitle: subtitle.isEmpty
-          ? const Text('No data captured')
-          : Text(subtitle.join(' · ')),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (bp != null || hr != null) ...[
+            if (bp != null)
+              Text(
+                'BP: $bp',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            if (bp != null && hr != null)
+              const SizedBox(height: 4),
+            if (hr != null)
+              Text(
+                'HR: $hr bpm',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+          ]
+          else
+            Text(
+              'No data captured',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -994,6 +1133,94 @@ class _ErrorStep extends StatelessWidget {
         Text(message, style: Theme.of(context).textTheme.bodyLarge),
         const SizedBox(height: 16),
         FilledButton(onPressed: onRetry, child: const Text('Retry')),
+      ],
+    );
+  }
+}
+
+class _StandPrepStep extends StatelessWidget {
+  const _StandPrepStep({required this.onNext});
+
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Icon(
+          Icons.arrow_upward,
+          size: 64,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Stand Up Now',
+          style: Theme.of(context).textTheme.headlineSmall,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Please stand up carefully. You may lean on a wall if needed. Keep still while standing.',
+          style: Theme.of(context).textTheme.bodyLarge,
+          textAlign: TextAlign.center,
+        ),
+        const Spacer(),
+        FilledButton(
+          onPressed: onNext,
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+          child: const Text('I\'m Standing - Continue'),
+        ),
+      ],
+    );
+  }
+}
+
+class _NextStepPrompt extends StatelessWidget {
+  const _NextStepPrompt({
+    required this.title,
+    required this.description,
+    required this.onNext,
+  });
+
+  final String title;
+  final String description;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Icon(
+          Icons.check_circle,
+          size: 64,
+          color: Colors.green,
+        ),
+        const SizedBox(height: 24),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.headlineSmall,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          description,
+          style: Theme.of(context).textTheme.bodyLarge,
+          textAlign: TextAlign.center,
+        ),
+        const Spacer(),
+        FilledButton(
+          onPressed: onNext,
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+          child: const Text('Continue'),
+        ),
       ],
     );
   }
