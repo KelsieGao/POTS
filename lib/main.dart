@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'core/services/supabase_service.dart';
 import 'features/polar/polar_heart_rate_page.dart';
-import 'features/clinician/clinician_code_entry_page.dart';
+//import 'features/clinician/clinician_code_entry_page.dart';
+import 'clinician_dashboard.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -105,7 +106,7 @@ class LaunchScreen extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const ClinicianCodeEntryPage(),
+                          builder: (_) => const DashboardScreen(),
                         ),
                       );
                     },
