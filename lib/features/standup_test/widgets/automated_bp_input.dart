@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pots/features/ihealth/ihealth_bp_controller.dart';
-import 'package:pots/features/ihealth/ihealth_connection_sheet.dart';
+import 'package:pots/shared/ihealth_kn550_service.dart';
+// import 'package:pots/features/ihealth/ihealth_bp_controller.dart'; // TODO: Re-implement with native SDK
+// import 'package:pots/features/ihealth/ihealth_connection_sheet.dart'; // TODO: Re-implement with native SDK
 
 class AutomatedBpInput extends StatefulWidget {
   const AutomatedBpInput({
@@ -9,7 +10,7 @@ class AutomatedBpInput extends StatefulWidget {
     required this.instruction,
     required this.onSubmit,
     required this.latestHr,
-    this.ihealthBpController,
+    // this.ihealthBpController, // TODO: Re-implement with native SDK
     this.autoSubmitDelay = const Duration(seconds: 2),
   });
 
@@ -17,7 +18,7 @@ class AutomatedBpInput extends StatefulWidget {
   final String instruction;
   final void Function(int systolic, int diastolic) onSubmit;
   final int? latestHr;
-  final IHealthBpController? ihealthBpController;
+  // final IHealthBpController? ihealthBpController; // TODO: Re-implement with native SDK
   final Duration autoSubmitDelay;
 
   @override
@@ -30,15 +31,19 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
   final _formKey = GlobalKey<FormState>();
   bool _isAutoSubmitting = false;
   bool _hasAutoSubmitted = false;
+  bool _isFetchingFromDevice = false;
   
   @override
   void initState() {
     super.initState();
     _systolicController.addListener(_onTextChanged);
     _diastolicController.addListener(_onTextChanged);
+    // TODO: Re-implement with native SDK
+    /*
     if (widget.ihealthBpController != null) {
       widget.ihealthBpController!.addListener(_handleBpUpdate);
     }
+    */
   }
   
   @override
@@ -47,7 +52,7 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
     _diastolicController.removeListener(_onTextChanged);
     _systolicController.dispose();
     _diastolicController.dispose();
-    widget.ihealthBpController?.removeListener(_handleBpUpdate);
+    // widget.ihealthBpController?.removeListener(_handleBpUpdate); // TODO: Re-implement with native SDK
     super.dispose();
   }
   
@@ -60,6 +65,8 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
   void _handleBpUpdate() {
     if (!mounted) return;
     
+    // TODO: Re-implement with native SDK
+    /*
     // If using iHealth and we have a NEW reading, update and submit
     if (widget.ihealthBpController != null && 
         widget.ihealthBpController!.hasLatestReading &&
@@ -78,6 +85,7 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
         _hasAutoSubmitted = true;
       }
     }
+    */
     
     if (mounted) {
       setState(() {});
@@ -221,21 +229,36 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
           
           const SizedBox(height: 16),
           
-          // Manual Submit Button - ALWAYS required
+          // Submit / Fetch from device
           FilledButton(
-            onPressed: _systolicController.text.isNotEmpty && _diastolicController.text.isNotEmpty
-                ? () {
+            onPressed: _isFetchingFromDevice
+                ? null
+                : () async {
+                    if (!mounted) return;
+                    setState(() => _isFetchingFromDevice = true);
+                    try {
+                      final svc = IHealthKn550Service.instance;
+                      final latest = await svc.fetchLatest(totalTimeout: const Duration(seconds: 8));
+                      if (latest != null) {
+                        _systolicController.text = latest.systolic.toString();
+                        _diastolicController.text = latest.diastolic.toString();
+                      }
+                    } catch (_) {}
+                    finally {
+                      if (!mounted) return;
+                      setState(() => _isFetchingFromDevice = false);
+                    }
+
                     if (_formKey.currentState?.validate() ?? false) {
                       final systolic = _systolicController.text.trim();
                       final diastolic = _diastolicController.text.trim();
                       widget.onSubmit(int.parse(systolic), int.parse(diastolic));
                     }
-                  }
-                : null,
+                  },
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
-            child: const Text('Confirm & Continue'),
+            child: Text(_isFetchingFromDevice ? 'Fetching from cuff...' : 'Done'),
           ),
         ],
       ),
@@ -312,6 +335,9 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
   }
 
   Widget _buildIHealthStatus(BuildContext context) {
+    // TODO: Re-implement with native SDK
+    return const SizedBox.shrink();
+    /*
     final controller = widget.ihealthBpController!;
     final status = controller.status;
     final isConnected = controller.isConnected;
@@ -366,10 +392,9 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
                   ),
             ),
           ),
-          // iHealth device connection temporarily disabled due to plugin issues
-          // Users can manually enter BP readings
         ],
       ),
     );
+    */
   }
 }

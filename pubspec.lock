@@ -488,14 +488,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.2"
-  ihealth_hr:
-    dependency: "direct main"
-    description:
-      name: ihealth_hr
-      sha256: "71f436f7de69324ea851bb855d79e00a5ee4cfef8f0fcd2bf045f979ea33d0f4"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.0.2"
   image:
     dependency: transitive
     description:

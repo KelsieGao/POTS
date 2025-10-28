@@ -5,6 +5,7 @@ import 'features/polar/polar_heart_rate_page.dart';
 import 'features/auth/sign_in_page.dart';
 import 'features/auth/sign_up_page.dart';
 import 'features/auth/patient_profile_completion_page.dart';
+import 'ihealth_test.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,7 @@ class PotsApp extends StatelessWidget {
         '/sign-up': (_) => const SignUpPage(),
         '/home': (_) => const PolarHeartRatePage(),
         '/patient-profile-complete': (_) => const PatientProfileCompletionPage(),
+        '/ihealth-test': (_) => const IHealthTestPage(),
       },
     );
   }
@@ -115,6 +117,21 @@ class LaunchScreen extends StatelessWidget {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => const SignUpPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildOptionCard(
+                    context,
+                    title: 'iHealth Test',
+                    subtitle: 'Test iHealth BP monitor integration',
+                    icon: Icons.bloodtype,
+                    color: const Color(0xFFF44336),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const IHealthTestPage(),
                         ),
                       );
                     },

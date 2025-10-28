@@ -1,7 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.kelsie.potsive">
-<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission
         android:name="android.permission.BLUETOOTH_SCAN"
@@ -15,7 +14,9 @@
 
     <application
         android:label="pots"
-        android:icon="@mipmap/ic_launcher">
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        tools:replace="android:name">
         <activity
             android:name=".MainActivity"
             android:exported="true"

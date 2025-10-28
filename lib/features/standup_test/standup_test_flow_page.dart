@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:pots/features/polar/polar_heart_rate_controller.dart';
-import 'package:pots/features/ihealth/ihealth_bp_controller.dart';
+// import 'package:pots/features/ihealth/ihealth_bp_controller.dart'; // TODO: Re-implement with native SDK
 import 'package:pots/features/standup_test/models/standup_test_data.dart';
 import 'package:pots/features/standup_test/pages/safety_acknowledgment_page.dart';
 import 'package:pots/features/standup_test/services/safety_service.dart';
@@ -16,13 +16,13 @@ class StandupTestFlowPage extends StatefulWidget {
   const StandupTestFlowPage({
     super.key,
     required this.polarController,
-    required this.ihealthBpController,
+    // required this.ihealthBpController, // TODO: Re-implement with native SDK
     required this.patientId,
     this.demoMode = true,
   });
 
   final PolarHeartRateController polarController;
-  final IHealthBpController ihealthBpController;
+  // final IHealthBpController ihealthBpController; // TODO: Re-implement with native SDK
   final String patientId;
   final bool demoMode;
 
@@ -42,24 +42,24 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
     super.initState();
     _controller = StandupTestController(
       polarController: widget.polarController,
-      ihealthBpController: widget.ihealthBpController,
+      // ihealthBpController: widget.ihealthBpController, // TODO: Re-implement with native SDK
       patientId: widget.patientId,
       demoMode: widget.demoMode,
     )..addListener(_handleUpdate);
     
     // Initialize iHealth connection
-    _initializeIHealth();
+    // _initializeIHealth(); // TODO: Re-implement with native SDK
     
     // Check for safety acknowledgment before starting
     _checkSafetyAcknowledgment();
   }
   
-  Future<void> _initializeIHealth() async {
+  /* Future<void> _initializeIHealth() async { // TODO: Re-implement with native SDK
     // Connect to iHealth device if known
     await widget.ihealthBpController.connectIfKnown();
     // Update patient ID
     widget.ihealthBpController.updatePatientId(widget.patientId);
-  }
+  } */
 
   void _handleUpdate() {
     if (!mounted) return;
@@ -295,7 +295,7 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
             _controller.setSupineBp(systolic: systolic, diastolic: diastolic);
           },
           latestHr: _controller.latestHeartRate,
-          ihealthBpController: widget.ihealthBpController,
+          // ihealthBpController: widget.ihealthBpController, // TODO: Re-implement with native SDK
         );
       case StandupStep.standPrep:
         return _StandPrepStep(
@@ -324,7 +324,7 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
             );
           },
           latestHr: _controller.latestHeartRate,
-          ihealthBpController: widget.ihealthBpController,
+          // ihealthBpController: widget.ihealthBpController, // TODO: Re-implement with native SDK
         );
       case StandupStep.standingCountdownTo3:
         // Check if we just finished BP input - show continue prompt instead
@@ -358,7 +358,7 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
             );
           },
           latestHr: _controller.latestHeartRate,
-          ihealthBpController: widget.ihealthBpController,
+          // ihealthBpController: widget.ihealthBpController, // TODO: Re-implement with native SDK
         );
       case StandupStep.standingCountdownTo5:
         // Check if we just finished BP input - show continue prompt instead
