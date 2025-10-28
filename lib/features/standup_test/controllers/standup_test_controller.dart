@@ -3,10 +3,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:pots/features/polar/polar_heart_rate_controller.dart';
-import 'package:pots/features/ihealth/ihealth_bp_controller.dart';
+// import 'package:pots/features/ihealth/ihealth_bp_controller.dart'; // TODO: Re-implement with native SDK
 
 import '../models/standup_test_data.dart';
 import '../services/standup_test_service.dart';
+import 'package:pots/shared/ihealth_kn550_service.dart';
 
 enum StandupStep {
   intro,
@@ -28,14 +29,14 @@ enum StandupStep {
 class StandupTestController extends ChangeNotifier {
   StandupTestController({
     required this.polarController,
-    required this.ihealthBpController,
+    // required this.ihealthBpController, // TODO: Re-implement with native SDK
     required this.patientId,
     this.demoMode = true,
     StandupTestService? service,
   }) : _service = service ?? StandupTestService();
 
   final PolarHeartRateController polarController;
-  final IHealthBpController ihealthBpController;
+  // final IHealthBpController ihealthBpController; // TODO: Re-implement with native SDK
   final String patientId;
   final bool demoMode;
   final StandupTestService _service;
@@ -47,7 +48,26 @@ class StandupTestController extends ChangeNotifier {
 
   Timer? _timer;
 
+  // De-dup marker per session
+  DateTime? _lastBpSyncedAt;
+
   bool get isCountdownActive => _timer != null;
+
+  /// Fetch latest KN‑550BT reading and return (or null on timeout/none).
+  Future<Map<String, int>?> fetchLatestBpReading({Duration timeout = const Duration(seconds: 8)}) async {
+    try {
+      final rec = await IHealthKn550Service.instance.fetchLatest(totalTimeout: timeout);
+      if (rec == null) return null;
+      _lastBpSyncedAt = rec.time;
+      return {
+        'systolic': rec.systolic,
+        'diastolic': rec.diastolic,
+        'heartRate': rec.heartRate,
+      };
+    } catch (_) {
+      return null;
+    }
+  }
   int? get latestHeartRate => polarController.heartRate;
 
   String? errorMessage;
@@ -201,8 +221,10 @@ class StandupTestController extends ChangeNotifier {
   // Add method for final BP reading (optional 10-minute reading)
   void setStanding10Min({int? systolic, int? diastolic}) {
     // Use values from iHealth controller if provided, otherwise use passed values
-    final sys = systolic ?? ihealthBpController.latestSystolic ?? 0;
-    final dia = diastolic ?? ihealthBpController.latestDiastolic ?? 0;
+    // final sys = systolic ?? ihealthBpController.latestSystolic ?? 0; // TODO: Re-implement with native SDK
+    // final dia = diastolic ?? ihealthBpController.latestDiastolic ?? 0; // TODO: Re-implement with native SDK
+    final sys = systolic ?? 0;
+    final dia = diastolic ?? 0;
     
     data.standing10MinSystolic = sys;
     data.standing10MinDiastolic = dia;

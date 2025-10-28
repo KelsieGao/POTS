@@ -16,8 +16,8 @@ import '../auth/sign_in_page.dart';
 import '../patient_signup/patient_signup_page.dart';
 import '../patient_signup/providers/patient_signup_controller.dart';
 import '../patient_signup/local/patient_storage.dart';
-import '../ihealth/ihealth_bp_controller.dart';
-import '../ihealth/ihealth_connection_sheet.dart';
+// import '../ihealth/ihealth_bp_controller.dart'; // TODO: Re-implement with native SDK
+// import '../ihealth/ihealth_connection_sheet.dart'; // TODO: Re-implement with native SDK
 import 'polar_connection_sheet.dart';
 import 'polar_heart_rate_controller.dart';
 
@@ -30,7 +30,7 @@ class PolarHeartRatePage extends StatefulWidget {
 
 class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
   late final PolarHeartRateController _polarController;
-  late final IHealthBpController _ihealthBpController;
+  // late final IHealthBpController _ihealthBpController; // TODO: Re-implement with native SDK
   late final PatientSignupController _patientController;
   bool _initialized = false;
   PatientProgress? _progress;
@@ -40,8 +40,8 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
     super.initState();
     _polarController = PolarHeartRateController();
     _polarController.addListener(_handlePolarUpdate);
-    _ihealthBpController = IHealthBpController();
-    _ihealthBpController.addListener(_handlePolarUpdate);
+    // _ihealthBpController = IHealthBpController(); // TODO: Re-implement with native SDK
+    // _ihealthBpController.addListener(_handlePolarUpdate); // TODO: Re-implement with native SDK
     _patientController = PatientSignupController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -90,7 +90,7 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
     
     // Set up controllers
     _polarController.updatePatientId(userId);
-    _ihealthBpController.updatePatientId(userId);
+    // _ihealthBpController.updatePatientId(userId); // TODO: Re-implement with native SDK
     
     // Check if profile is complete (reason_for_using_app should not be "Other" if incomplete)
     final isProfileComplete = await _checkProfileComplete();
@@ -114,7 +114,7 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
     
     // Connect to devices if available
     unawaited(_polarController.connectIfKnown());
-    unawaited(_ihealthBpController.connectIfKnown());
+    // unawaited(_ihealthBpController.connectIfKnown()); // TODO: Re-implement with native SDK
     
     // Load progress
     await _loadProgress();
@@ -224,8 +224,8 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
   void dispose() {
     _polarController.removeListener(_handlePolarUpdate);
     _polarController.dispose();
-    _ihealthBpController.removeListener(_handlePolarUpdate);
-    _ihealthBpController.dispose();
+    // _ihealthBpController.removeListener(_handlePolarUpdate); // TODO: Re-implement with native SDK
+    // _ihealthBpController.dispose(); // TODO: Re-implement with native SDK
     _patientController.dispose();
     super.dispose();
   }
@@ -289,7 +289,7 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
       MaterialPageRoute<bool>(
         builder: (_) => StandupTestFlowPage(
           polarController: _polarController,
-          ihealthBpController: _ihealthBpController,
+          // ihealthBpController: _ihealthBpController, // TODO: Re-implement with native SDK
           patientId: patientId,
           demoMode: kDebugMode,
         ),
@@ -325,6 +325,8 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
   }
 
   Future<void> _openIHealthConnectionSheet() async {
+    // TODO: Re-implement with native SDK
+    /*
     FocusScope.of(context).unfocus();
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -343,6 +345,7 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
         duration: Duration(seconds: 2),
       ),
     );
+    */
   }
 
   @override
