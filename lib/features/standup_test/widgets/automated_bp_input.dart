@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pots/shared/ihealth_kn550_service.dart';
 // import 'package:pots/features/ihealth/ihealth_bp_controller.dart'; // TODO: Re-implement with native SDK
@@ -12,6 +13,7 @@ class AutomatedBpInput extends StatefulWidget {
     required this.latestHr,
     // this.ihealthBpController, // TODO: Re-implement with native SDK
     this.autoSubmitDelay = const Duration(seconds: 2),
+    this.deviceOnly = false,
   });
 
   final String title;
@@ -20,6 +22,7 @@ class AutomatedBpInput extends StatefulWidget {
   final int? latestHr;
   // final IHealthBpController? ihealthBpController; // TODO: Re-implement with native SDK
   final Duration autoSubmitDelay;
+  final bool deviceOnly;
 
   @override
   State<AutomatedBpInput> createState() => _AutomatedBpInputState();
@@ -32,6 +35,10 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
   bool _isAutoSubmitting = false;
   bool _hasAutoSubmitted = false;
   bool _isFetchingFromDevice = false;
+  bool _autoModeActive = false;
+  bool _fetchInFlight = false;
+  Timer? _autoFetchTimer;
+  int _autoSeconds = 0;
   
   @override
   void initState() {
@@ -44,6 +51,9 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
       widget.ihealthBpController!.addListener(_handleBpUpdate);
     }
     */
+    if (widget.deviceOnly) {
+      _startAutoFetch();
+    }
   }
   
   @override
@@ -52,6 +62,7 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
     _diastolicController.removeListener(_onTextChanged);
     _systolicController.dispose();
     _diastolicController.dispose();
+    _autoFetchTimer?.cancel();
     // widget.ihealthBpController?.removeListener(_handleBpUpdate); // TODO: Re-implement with native SDK
     super.dispose();
   }
@@ -59,6 +70,41 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
   void _onTextChanged() {
     setState(() {
       // Update state to enable/disable button based on text
+    });
+  }
+
+  void _startAutoFetch() {
+    _autoModeActive = true;
+    _autoSeconds = 0;
+    _autoFetchTimer?.cancel();
+    _autoFetchTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (!mounted) return;
+      _autoSeconds += 2;
+      if (_fetchInFlight) return;
+      _fetchInFlight = true;
+      try {
+        final svc = IHealthKn550Service.instance;
+        final latest = await svc.fetchLatest(totalTimeout: const Duration(seconds: 5));
+        if (!mounted) return;
+        if (latest != null) {
+          _systolicController.text = latest.systolic.toString();
+          _diastolicController.text = latest.diastolic.toString();
+          // Auto-submit immediately
+          final s = int.tryParse(_systolicController.text.trim());
+          final d = int.tryParse(_diastolicController.text.trim());
+          if (s != null && d != null && !_hasAutoSubmitted) {
+            _hasAutoSubmitted = true;
+            widget.onSubmit(s, d);
+            timer.cancel();
+            _autoModeActive = false;
+          }
+        }
+      } catch (_) {
+        // Ignore and keep polling
+      } finally {
+        _fetchInFlight = false;
+        if (mounted) setState(() {});
+      }
     });
   }
 
@@ -147,6 +193,58 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Connectivity handoff CTA (non-blocking)
+          Builder(builder: (context) {
+            final mac = IHealthKn550Service.instance.lastConnectedMac;
+            if (mac != null && mac.isNotEmpty) return const SizedBox.shrink();
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.bluetooth, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Text('Connect your iHealth cuff to fetch readings automatically.')),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pushNamed('/ihealth-test');
+                    },
+                    child: const Text('Connect cuff'),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (widget.deviceOnly) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Press START on your iHealth BP cuff now. Values will fill automatically.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.blue.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           Text(
             widget.title,
             style: Theme.of(context).textTheme.headlineSmall,
@@ -163,41 +261,42 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
           
           const SizedBox(height: 8),
           
-          // BP Input Fields
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _systolicController,
-                  decoration: const InputDecoration(
-                    labelText: 'Systolic (mmHg)',
-                    border: OutlineInputBorder(),
-                    suffixText: 'mmHg',
+          // BP Input Fields (hidden when device-only)
+          if (!widget.deviceOnly)
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _systolicController,
+                    decoration: const InputDecoration(
+                      labelText: 'Systolic (mmHg)',
+                      border: OutlineInputBorder(),
+                      suffixText: 'mmHg',
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: _validateInt,
+                    textInputAction: TextInputAction.next,
+                    onEditingComplete: () {
+                      FocusScope.of(context).nextFocus();
+                    },
                   ),
-                  keyboardType: TextInputType.number,
-                  validator: _validateInt,
-                  textInputAction: TextInputAction.next,
-                  onEditingComplete: () {
-                    FocusScope.of(context).nextFocus();
-                  },
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  controller: _diastolicController,
-                  decoration: const InputDecoration(
-                    labelText: 'Diastolic (mmHg)',
-                    border: OutlineInputBorder(),
-                    suffixText: 'mmHg',
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    controller: _diastolicController,
+                    decoration: const InputDecoration(
+                      labelText: 'Diastolic (mmHg)',
+                      border: OutlineInputBorder(),
+                      suffixText: 'mmHg',
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: _validateInt,
+                    textInputAction: TextInputAction.done,
                   ),
-                  keyboardType: TextInputType.number,
-                  validator: _validateInt,
-                  textInputAction: TextInputAction.done,
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           
           const SizedBox(height: 16),
           
@@ -230,36 +329,53 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
           const SizedBox(height: 16),
           
           // Submit / Fetch from device
-          FilledButton(
-            onPressed: _isFetchingFromDevice
-                ? null
-                : () async {
-                    if (!mounted) return;
-                    setState(() => _isFetchingFromDevice = true);
-                    try {
-                      final svc = IHealthKn550Service.instance;
-                      final latest = await svc.fetchLatest(totalTimeout: const Duration(seconds: 8));
-                      if (latest != null) {
-                        _systolicController.text = latest.systolic.toString();
-                        _diastolicController.text = latest.diastolic.toString();
-                      }
-                    } catch (_) {}
-                    finally {
+          if (!widget.deviceOnly)
+            FilledButton(
+              onPressed: _isFetchingFromDevice
+                  ? null
+                  : () async {
                       if (!mounted) return;
-                      setState(() => _isFetchingFromDevice = false);
-                    }
+                      setState(() => _isFetchingFromDevice = true);
+                      try {
+                        final svc = IHealthKn550Service.instance;
+                        final latest = await svc.fetchLatest(totalTimeout: const Duration(seconds: 8));
+                        if (latest != null) {
+                          _systolicController.text = latest.systolic.toString();
+                          _diastolicController.text = latest.diastolic.toString();
+                        }
+                      } catch (_) {}
+                      finally {
+                        if (!mounted) return;
+                        setState(() => _isFetchingFromDevice = false);
+                      }
 
-                    if (_formKey.currentState?.validate() ?? false) {
-                      final systolic = _systolicController.text.trim();
-                      final diastolic = _diastolicController.text.trim();
-                      widget.onSubmit(int.parse(systolic), int.parse(diastolic));
-                    }
-                  },
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+                      if (_formKey.currentState?.validate() ?? false) {
+                        final systolic = _systolicController.text.trim();
+                        final diastolic = _diastolicController.text.trim();
+                        widget.onSubmit(int.parse(systolic), int.parse(diastolic));
+                      }
+                    },
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: Text(
+                _isFetchingFromDevice ? 'Fetching from cuff...' : 'Done',
+              ),
             ),
-            child: Text(_isFetchingFromDevice ? 'Fetching from cuff...' : 'Done'),
-          ),
+          if (widget.deviceOnly)
+            Center(
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  const CircularProgressIndicator(strokeWidth: 2),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Waiting for cuff reading... ${_autoSeconds}s',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -269,7 +385,23 @@ class _AutomatedBpInputState extends State<AutomatedBpInput> {
     final systolic = _systolicController.text.trim();
     final diastolic = _diastolicController.text.trim();
     
-    if (systolic.isEmpty && diastolic.isEmpty) {
+    if (widget.deviceOnly && systolic.isEmpty && diastolic.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue.shade200),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.bloodtype, color: Colors.blue),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Press START on your iHealth cuff, then tap "Fetch from cuff".')),
+          ],
+        ),
+      );
+    } else if (systolic.isEmpty && diastolic.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(

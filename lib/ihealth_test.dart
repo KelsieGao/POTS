@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:pots/shared/ihealth_kn550_service.dart';
 
 class IHealthTestPage extends StatefulWidget {
   const IHealthTestPage({super.key});
@@ -21,6 +22,7 @@ class _IHealthTestPageState extends State<IHealthTestPage> {
   String? _connectedAddress;
   List<Map<String, dynamic>> _devices = const [];
   Map<String, dynamic>? _lastReading;
+  List<Map<String, dynamic>> _recentReadings = const [];
   StreamSubscription? _eventSub;
   bool _useSdk = true;
   String? _selectedMac;
@@ -50,15 +52,39 @@ class _IHealthTestPageState extends State<IHealthTestPage> {
               _devices = list;
             });
           }
-        } else if (reading['event'] == 'bpOfflineData') {
-          // Show the last record quickly
-          final recs = reading['records'];
+        } else if (reading['event'] == 'bpOfflineData' || reading['action'] == 'historicaldata_bp') {
+          // Show the latest 3 records with timestamps
+          final recs = reading['records'] ?? reading['data'];
           if (recs is List && recs.isNotEmpty) {
-            final last = Map<String, dynamic>.from(recs.last as Map);
-            setState(() {
-              _lastReading = last;
-              _status = 'BP: ${last['systolic']}/${last['diastolic']}  HR: ${last['heartRate']}';
+            final items = recs
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
+
+            // Sort by time if available
+            items.sort((a, b) {
+              final asrc = a['time']?.toString() ?? '';
+              final bsrc = b['time']?.toString() ?? '';
+              final anorm = asrc.contains('T') ? asrc : asrc.replaceFirst(' ', 'T');
+              final bnorm = bsrc.contains('T') ? bsrc : bsrc.replaceFirst(' ', 'T');
+              final at = DateTime.tryParse(anorm) ?? DateTime.fromMillisecondsSinceEpoch(0);
+              final bt = DateTime.tryParse(bnorm) ?? DateTime.fromMillisecondsSinceEpoch(0);
+              return at.compareTo(bt);
             });
+
+            final start = items.length >= 3 ? items.length - 3 : 0;
+            final latest3 = items.sublist(start).reversed.toList(); // newest first
+
+            setState(() {
+              _recentReadings = latest3;
+              _lastReading = latest3.isNotEmpty ? latest3.first : null;
+              _status = 'Received ${items.length} record(s); showing latest ${latest3.length}';
+            });
+            try {
+              if (_connectedAddress != null) {
+                unawaited(platform.invokeMethod('sdkTransferFinished', {'mac': _connectedAddress}));
+              }
+            } catch (_) {}
           }
         } else if (reading.containsKey('systolic') && reading.containsKey('diastolic')) {
           setState(() {
@@ -166,6 +192,7 @@ class _IHealthTestPageState extends State<IHealthTestPage> {
         await platform.invokeMethod('sdkConnect', {'mac': address});
         ok = true;
         _selectedMac = address;
+        IHealthKn550Service.instance.setLastConnectedMac(address);
       } else {
         ok = await platform.invokeMethod('connectToDevice', {'address': address});
       }
@@ -366,13 +393,38 @@ class _IHealthTestPageState extends State<IHealthTestPage> {
                     ),
             ),
             const SizedBox(height: 12),
-            if (_lastReading != null)
+            if (_recentReadings.isNotEmpty)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
-                  child: Text(
-                    'Last Reading: ${_lastReading!['systolic']}/${_lastReading!['diastolic']} mmHg'
-                    '${_lastReading!['heartRate'] != null ? '  •  HR ${_lastReading!['heartRate']} bpm' : ''}',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Recent Readings (latest 3):',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      for (final r in _recentReadings)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Builder(
+                            builder: (_) {
+                              final raw = r['time']?.toString() ?? '';
+                              final norm = raw.contains('T') ? raw : raw.replaceFirst(' ', 'T');
+                              final dt = DateTime.tryParse(norm);
+                              final ts = dt != null ? dt.toLocal().toString() : (raw.isNotEmpty ? raw : '-');
+                              final sys = r['systolic'] ?? r['sys'];
+                              final dia = r['diastolic'] ?? r['dia'];
+                              final hr = r['heartRate'] ?? r['pulse_bp'];
+                              return Text(
+                                'BP $sys/$dia mmHg  •  HR ${hr ?? '-'} bpm  •  $ts',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              );
+                            },
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),

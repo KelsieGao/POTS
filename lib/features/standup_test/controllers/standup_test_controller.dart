@@ -96,11 +96,8 @@ class StandupTestController extends ChangeNotifier {
     
     debugPrint('Supine BP set: ${data.supineSystolic}/${data.supineDiastolic}');
     
-    // Automatically advance to stand prep after BP entry
-    step = StandupStep.standPrep;
-    notifyListeners();
-    
-    // NO auto-advance - user must manually proceed
+    // Automatically begin standing countdown (no manual continue)
+    _startStandingCountdown1();
   }
 
   void setStanding1Min({int? systolic, int? diastolic}) {
@@ -111,9 +108,8 @@ class StandupTestController extends ChangeNotifier {
     
     debugPrint('Standing 1min BP set: ${data.standing1MinSystolic}/${data.standing1MinDiastolic}');
     
-    // Show a "ready" prompt - user clicks continue button
-    step = StandupStep.standingCountdownTo3;
-    notifyListeners();
+    // Immediately start countdown to 3 minutes
+    _startStandingCountdownTo3();
   }
 
   void setStanding3Min({int? systolic, int? diastolic}) {
@@ -124,9 +120,37 @@ class StandupTestController extends ChangeNotifier {
     
     debugPrint('Standing 3min BP set: ${data.standing3MinSystolic}/${data.standing3MinDiastolic}');
     
-    // Show a "ready" prompt - user clicks continue button
-    step = StandupStep.standingCountdownTo5;
-    notifyListeners();
+    // Immediately start countdown to 5 minutes
+    _startStandingCountdownTo5();
+  }
+
+  /// Best-effort: At the end of the test, read the last three offline BP
+  /// records from the cuff and fill any missing supine/1min/3min values.
+  Future<void> ensureBpFromLastThree() async {
+    try {
+      final mac = IHealthKn550Service.instance.lastConnectedMac;
+      if (mac == null || mac.isEmpty) return;
+      final dataList = await IHealthKn550Service.instance.getOfflineData(mac);
+      if (dataList.isEmpty) return;
+      dataList.sort((a, b) => a.time.compareTo(b.time));
+      final start = dataList.length >= 3 ? dataList.length - 3 : 0;
+      final last3 = dataList.sublist(start);
+      if (last3.isNotEmpty) {
+        final sup = last3.first;
+        data.supineSystolic ??= sup.systolic;
+        data.supineDiastolic ??= sup.diastolic;
+      }
+      if (last3.length >= 2) {
+        final m = last3[last3.length - 2];
+        data.standing1MinSystolic ??= m.systolic;
+        data.standing1MinDiastolic ??= m.diastolic;
+      }
+      if (last3.isNotEmpty) {
+        final latest = last3.last;
+        data.standing3MinSystolic ??= latest.systolic;
+        data.standing3MinDiastolic ??= latest.diastolic;
+      }
+    } catch (_) {}
   }
 
   void cancelCountdown() {

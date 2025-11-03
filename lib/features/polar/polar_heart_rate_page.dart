@@ -20,6 +20,7 @@ import '../patient_signup/local/patient_storage.dart';
 // import '../ihealth/ihealth_connection_sheet.dart'; // TODO: Re-implement with native SDK
 import 'polar_connection_sheet.dart';
 import 'polar_heart_rate_controller.dart';
+import 'package:pots/shared/ihealth_kn550_service.dart';
 
 class PolarHeartRatePage extends StatefulWidget {
   const PolarHeartRatePage({super.key});
@@ -401,9 +402,8 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
             const SizedBox(height: 16),
             if (error != null) _ErrorNotice(message: error),
             if (error != null) const SizedBox(height: 16),
-            Text(
-              'This app reconnects to your last Polar device automatically when it is nearby.',
-              style: theme.textTheme.bodyMedium,
+            _DeviceSection(
+              polarController: _polarController,
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
@@ -450,22 +450,7 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
             ),
             const SizedBox(height: 16),
             const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _polarController.isBusy ? null : _openConnectionSheet,
-              icon: const Icon(Icons.bluetooth_searching),
-              label: Text(
-                _polarController.isStreaming
-                    ? 'Manage Polar Connection'
-                    : 'Connect Polar Device',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: _shouldAllowDisconnect()
-                  ? _polarController.disconnect
-                  : null,
-              child: const Text('Disconnect'),
-            ),
+            // Device management buttons are inside _DeviceSection now
             // iHealth BP monitor temporarily disabled due to SDK issues
             // const SizedBox(height: 24),
             // FilledButton.icon(
@@ -760,6 +745,150 @@ class _ProgressItem extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DeviceSection extends StatefulWidget {
+  const _DeviceSection({required this.polarController});
+
+  final PolarHeartRateController polarController;
+
+  @override
+  State<_DeviceSection> createState() => _DeviceSectionState();
+}
+
+class _DeviceSectionState extends State<_DeviceSection> {
+  final _ihealth = IHealthKn550Service.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    // Best-effort init in the background
+    Future(() async {
+      await _ihealth.initialize();
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final polar = widget.polarController;
+    final polarStatus = polar.status.label;
+    final polarDevice = polar.deviceId ?? 'Not connected';
+    final mac = _ihealth.lastConnectedMac ?? '';
+    final ihealthConnected = _ihealth.isConnected;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Polar card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.monitor_heart, color: Colors.red),
+                  const SizedBox(width: 8),
+                  Text('Polar Heart Rate', style: theme.textTheme.titleMedium),
+                  const Spacer(),
+                  if (polar.isStreaming)
+                    const Chip(label: Text('Streaming'))
+                  else
+                    const Chip(label: Text('Idle')),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('Status: $polarStatus'),
+              Text('Device: $polarDevice'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  FilledButton.icon(
+                    onPressed: polar.isBusy ? null : () async {
+                      await showModalBottomSheet<bool>(
+                        context: context,
+                        isScrollControlled: true,
+                        useSafeArea: true,
+                        builder: (context) => PolarConnectionSheet(controller: polar),
+                      );
+                      if (mounted) setState(() {});
+                    },
+                    icon: const Icon(Icons.bluetooth_searching),
+                    label: Text(polar.isStreaming ? 'Manage' : 'Connect'),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton(
+                    onPressed: (polar.status == PolarConnectionStatus.connected || polar.status == PolarConnectionStatus.streaming)
+                        ? polar.disconnect
+                        : null,
+                    child: const Text('Disconnect'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // iHealth card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.bloodtype, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Text('iHealth Blood Pressure', style: theme.textTheme.titleMedium),
+                  const Spacer(),
+                  Chip(label: Text(ihealthConnected ? 'Connected' : 'Not connected')),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('Last device: ${mac.isEmpty ? '—' : mac}'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  FilledButton.icon(
+                    onPressed: () async {
+                      // If we know a MAC, quick connect; otherwise open the iHealth page
+                      if (mac.isNotEmpty) {
+                        await _ihealth.connect(mac);
+                        if (mounted) setState(() {});
+                      } else {
+                        if (!mounted) return;
+                        await Navigator.of(context).pushNamed('/ihealth-test');
+                        if (mounted) setState(() {});
+                      }
+                    },
+                    icon: const Icon(Icons.bluetooth_connected),
+                    label: Text(mac.isNotEmpty ? 'Connect' : 'Open iHealth'),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton(
+                    onPressed: ihealthConnected
+                        ? () async { await _ihealth.disconnect(); if (mounted) setState(() {}); }
+                        : null,
+                    child: const Text('Disconnect'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
