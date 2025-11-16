@@ -122,20 +122,6 @@ class LaunchScreen extends StatelessWidget {
                     },
                   ),
                   const SizedBox(height: 16),
-                  _buildOptionCard(
-                    context,
-                    title: 'iHealth Test',
-                    subtitle: 'Test iHealth BP monitor integration',
-                    icon: Icons.bloodtype,
-                    color: const Color(0xFFF44336),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const IHealthTestPage(),
-                        ),
-                      );
-                    },
-                  ),
                     const SizedBox(height: 32),
                     Text(
                       'Tap to continue',

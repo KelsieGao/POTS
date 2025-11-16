@@ -21,6 +21,7 @@ import '../patient_signup/local/patient_storage.dart';
 import 'polar_connection_sheet.dart';
 import 'polar_heart_rate_controller.dart';
 import 'package:pots/shared/ihealth_kn550_service.dart';
+import '../report/report_service.dart';
 
 class PolarHeartRatePage extends StatefulWidget {
   const PolarHeartRatePage({super.key});
@@ -107,8 +108,8 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
       return;
     }
     
-    // Check VOSS completion
-    final hasCompletedVoss = await _patientController.hasCompletedVoss();
+    // Check VOSS completion from server (one-time)
+    final hasCompletedVoss = await _hasCompletedVoss(userId);
     if (!hasCompletedVoss && userId != null) {
       await _openVossQuestionnaire(userId);
     }
@@ -124,6 +125,27 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
       _initialized = true;
     });
   }
+  
+  Future<bool> _hasCompletedVoss(String userId) async {
+    try {
+      final client = SupabaseService.client;
+      final response = await client
+          .from('voss_questionnaires')
+          .select('id')
+          .eq('patient_id', userId)
+          .order('completed_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      return response != null;
+    } catch (_) {
+      try {
+        final storage = await PatientStorage.create();
+        return storage.hasCompletedVoss;
+      } catch (_) {
+        return false;
+      }
+    }
+  }
 
   Future<bool> _checkPatientRecordExists(String userId) async {
     try {
@@ -135,7 +157,12 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
           .maybeSingle();
       return response != null;
     } catch (e) {
-      return false;
+      try {
+        final storage = await PatientStorage.create();
+        return storage.hasCompletedProfile;
+      } catch (_) {
+        return false;
+      }
     }
   }
 
@@ -155,7 +182,12 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
       return response['reason_for_using_app'] != null && 
              response['reason_for_using_app'] != '';
     } catch (e) {
-      return false;
+      try {
+        final storage = await PatientStorage.create();
+        return storage.hasCompletedProfile;
+      } catch (_) {
+        return false;
+      }
     }
   }
 
@@ -198,6 +230,26 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
           (route) => false,
         );
       }
+    }
+  }
+  
+  Future<void> _exportReport() async {
+    final userId = AuthService.currentUser?.id;
+    if (userId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to export a report')),
+      );
+      return;
+    }
+    try {
+      final service = ReportService();
+      await service.exportPatientReport(userId);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to export report: $e')),
+      );
     }
   }
 
@@ -366,6 +418,11 @@ class _PolarHeartRatePageState extends State<PolarHeartRatePage> {
       appBar: AppBar(
         title: const Text('POTS Monitor'),
         actions: [
+          IconButton(
+            onPressed: _exportReport,
+            icon: const Icon(Icons.picture_as_pdf),
+            tooltip: 'Export PDF',
+          ),
           IconButton(
             onPressed: _editProfile,
             icon: const Icon(Icons.person),

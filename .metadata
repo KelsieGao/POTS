@@ -43,3 +43,53 @@ migration:
   unmanaged_files:
     - 'lib/main.dart'
     - 'ios/Runner.xcodeproj/project.pbxproj'
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+void main() => runApp(const MyApp());
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  // 👇 Must match exactly the Kotlin channel name
+  static const _channel = MethodChannel('com.kelsie.potsive/ihealth');
+
+  String _status = 'Waiting...';
+
+  Future<void> _initIHealth() async {
+    try {
+      // 👇 Must match exactly the Kotlin method name
+      final bool ok = await _channel.invokeMethod('initIHealth');
+      setState(() => _status = 'SDK initialized: $ok');
+    } on PlatformException catch (e) {
+      setState(() => _status = 'PlatformException: ${e.message}');
+    } on MissingPluginException {
+      setState(() => _status = '❌ Missing plugin (check channel or method name)');
+    } catch (e) {
+      setState(() => _status = 'Error: $e');
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _initIHealth(); // call when app starts
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(title: const Text('iHealth SDK Test')),
+        body: Center(
+          child: Text(_status, style: const TextStyle(fontSize: 18)),
+        ),
+      ),
+    );
+  }
+}

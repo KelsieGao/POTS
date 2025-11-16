@@ -298,7 +298,7 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
       case StandupStep.supineEntry:
         return DeviceAutoBpCapture(
           title: 'Supine Blood Pressure Reading',
-          message: 'Press START on your iHealth monitor now while still lying down. We will capture the reading automatically.',
+          message: 'Press START on your iHealth monitor now while still lying down. We will capture the reading automatically. If the blood pressure device doesn\'t work, click START twice.',
           onCaptured: (sys, dia) {
             _controller.setSupineBp(systolic: sys, diastolic: dia);
           },
@@ -325,7 +325,7 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
       case StandupStep.standingEntry1:
         return DeviceAutoBpCapture(
           title: '1-Minute Standing Blood Pressure',
-          message: 'You\'ve been standing for 1 minute. Press START on your iHealth monitor now. We will capture the reading automatically.',
+          message: 'You\'ve been standing for 1 minute. Press START on your iHealth monitor now. We will capture the reading automatically. If the blood pressure device doesn\'t work, click START twice.',
           onCaptured: (sys, dia) {
             _controller.setStanding1Min(systolic: sys, diastolic: dia);
           },
@@ -354,7 +354,7 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
       case StandupStep.standingEntry3:
         return DeviceAutoBpCapture(
           title: '3-Minute Standing Blood Pressure',
-          message: 'You\'ve been standing for 3 minutes. Press START on your iHealth monitor now. We will capture the reading automatically.',
+          message: 'You\'ve been standing for 3 minutes. Press START on your iHealth monitor now. We will capture the reading automatically. If the blood pressure device doesn\'t work, click START twice.',
           onCaptured: (sys, dia) {
             _controller.setStanding3Min(systolic: sys, diastolic: dia);
           },

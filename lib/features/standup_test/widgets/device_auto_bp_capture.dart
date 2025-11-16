@@ -144,7 +144,8 @@ class _DeviceAutoBpCaptureState extends State<DeviceAutoBpCapture> {
         const SizedBox(height: 12),
         Text(widget.message, style: Theme.of(context).textTheme.bodyLarge),
         const SizedBox(height: 24),
-        if (!IHealthKn550Service.instance.isConnected)
+        // Only show the connection helper if we have no remembered device.
+        if (!IHealthKn550Service.instance.isConnected && (mac == null || mac.isEmpty))
           Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
@@ -190,12 +191,11 @@ class _DeviceAutoBpCaptureState extends State<DeviceAutoBpCapture> {
               Text('Waiting for cuff reading... ${_elapsedSec}s',
                   style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 4),
-              Text(
-                IHealthKn550Service.instance.isConnected && (mac != null && mac.isNotEmpty)
-                    ? 'Connected to $mac'
-                    : 'Not connected',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              if (IHealthKn550Service.instance.isConnected && (mac != null && mac.isNotEmpty))
+                Text(
+                  'Connected to $mac',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
             ],
           ),
         ),

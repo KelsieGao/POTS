@@ -278,7 +278,7 @@ class MainActivity : FlutterActivity() {
         // GET_SIGNING_CERTIFICATES is the modern flag; fallback will use .signatures if needed
         val info = pm.getPackageInfo(applicationContext.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
         // signingInfo may be null on some devices / API combos; fall back to legacy signatures
-        val signers = info.signingInfo?.apkContentsSigners ?: info.signatures
+        val signers = info.signingInfo?.apkContentsSigners ?q: info.signatures
 
         if (signers == null || signers.isEmpty()) {
             Log.d("iHealth", "No signing certificates found for package ${applicationContext.packageName}")
