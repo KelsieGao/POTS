@@ -5,6 +5,7 @@ class PatientStorage {
 
   static const _patientIdKey = 'patient_id';
   static const _vossCompletedKey = 'voss_completed';
+  static const _profileCompletedKey = 'profile_completed';
 
   final SharedPreferences _prefs;
 
@@ -15,6 +16,7 @@ class PatientStorage {
 
   String? get patientId => _prefs.getString(_patientIdKey);
   bool get hasCompletedVoss => _prefs.getBool(_vossCompletedKey) ?? false;
+  bool get hasCompletedProfile => _prefs.getBool(_profileCompletedKey) ?? false;
 
   Future<void> savePatientId(String id) async {
     await _prefs.setString(_patientIdKey, id);
@@ -23,9 +25,14 @@ class PatientStorage {
   Future<void> setVossCompleted(bool value) async {
     await _prefs.setBool(_vossCompletedKey, value);
   }
+  
+  Future<void> setProfileCompleted(bool value) async {
+    await _prefs.setBool(_profileCompletedKey, value);
+  }
 
   Future<void> clear() async {
     await _prefs.remove(_patientIdKey);
     await _prefs.remove(_vossCompletedKey);
+    await _prefs.remove(_profileCompletedKey);
   }
 }

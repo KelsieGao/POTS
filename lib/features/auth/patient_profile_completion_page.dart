@@ -16,6 +16,8 @@ class PatientProfileCompletionPage extends StatefulWidget {
 class _PatientProfileCompletionPageState extends State<PatientProfileCompletionPage> {
   final _formKey = GlobalKey<FormState>();
   
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
@@ -27,10 +29,58 @@ class _PatientProfileCompletionPageState extends State<PatientProfileCompletionP
   String? _selectedReason;
   
   bool _isLoading = false;
+  bool _isPrefillLoading = true;
   String? _errorMessage;
   
   @override
+  void initState() {
+    super.initState();
+    // Best-effort prefill for editing flow
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prefillIfExisting();
+    });
+  }
+
+  Future<void> _prefillIfExisting() async {
+    try {
+      final userId = AuthService.currentUser?.id;
+      if (userId == null) return;
+      final client = SupabaseService.client;
+      final existing = await client
+          .from('patients')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      if (existing == null) return;
+      setState(() {
+        final dob = existing['date_of_birth'] as String?;
+        _firstNameController.text = (existing['first_name'] ?? '').toString();
+        _lastNameController.text = (existing['last_name'] ?? '').toString();
+        _phoneController.text = (existing['phone'] ?? '').toString();
+        _heightController.text = (existing['height_cm']?.toString() ?? '');
+        _weightController.text = (existing['weight_kg']?.toString() ?? '');
+        _physicianController.text = (existing['primary_care_physician'] ?? '').toString();
+        _selectedSex = (existing['sex_assigned_at_birth'] ?? '') as String?;
+        _selectedReason = (existing['reason_for_using_app'] ?? '') as String?;
+        if (dob != null && dob.isNotEmpty) {
+          _dateOfBirth = DateTime.tryParse(dob) ?? _dateOfBirth;
+        }
+      });
+    } catch (_) {
+      // Ignore: prefill is best-effort
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPrefillLoading = false;
+        });
+      }
+    }
+  }
+  
+  @override
   void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _phoneController.dispose();
     _heightController.dispose();
     _weightController.dispose();
@@ -74,19 +124,49 @@ class _PatientProfileCompletionPageState extends State<PatientProfileCompletionP
           .maybeSingle();
       
       if (existing == null) {
-        throw Exception('Patient profile not found. Please contact support.');
+        // Create the patient profile for the first time
+        await client.from('patients').insert({
+          'id': userId,
+          'first_name': _firstNameController.text.trim(),
+          'last_name': _lastNameController.text.trim(),
+          'email': AuthService.currentUser?.email,
+          'date_of_birth': _dateOfBirth.toIso8601String(),
+          'phone': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+          'height_cm': _heightController.text.trim().isEmpty ? null : int.tryParse(_heightController.text.trim()),
+          'weight_kg': _weightController.text.trim().isEmpty ? null : double.tryParse(_weightController.text.trim()),
+          'primary_care_physician': _physicianController.text.trim().isEmpty ? null : _physicianController.text.trim(),
+          'sex_assigned_at_birth': _selectedSex!,
+          'reason_for_using_app': _selectedReason!,
+          'created_at': now,
+          'updated_at': now,
+        });
+      } else {
+        // Update existing profile
+        await client.from('patients').update({
+          'first_name': _firstNameController.text.trim().isEmpty ? existing['first_name'] : _firstNameController.text.trim(),
+          'last_name': _lastNameController.text.trim().isEmpty ? existing['last_name'] : _lastNameController.text.trim(),
+          'date_of_birth': _dateOfBirth.toIso8601String(),
+          'phone': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+          'height_cm': _heightController.text.trim().isEmpty ? null : int.tryParse(_heightController.text.trim()),
+          'weight_kg': _weightController.text.trim().isEmpty ? null : double.tryParse(_weightController.text.trim()),
+          'primary_care_physician': _physicianController.text.trim().isEmpty ? null : _physicianController.text.trim(),
+          'sex_assigned_at_birth': _selectedSex!,
+          'reason_for_using_app': _selectedReason!,
+          'updated_at': now,
+        }).eq('id', userId);
       }
       
-      await client.from('patients').update({
-        'date_of_birth': _dateOfBirth.toIso8601String(),
-        'phone': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-        'height_cm': _heightController.text.trim().isEmpty ? null : int.tryParse(_heightController.text.trim()),
-        'weight_kg': _weightController.text.trim().isEmpty ? null : double.tryParse(_weightController.text.trim()),
-        'primary_care_physician': _physicianController.text.trim().isEmpty ? null : _physicianController.text.trim(),
-        'sex_assigned_at_birth': _selectedSex!,
-        'reason_for_using_app': _selectedReason!,
-        'updated_at': now,
-      }).eq('id', userId);
+      // Confirm save by re-fetching and notify user
+      final savedRow = await client
+          .from('patients')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      if (mounted && savedRow != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile saved')),
+        );
+      }
       
       // Link to clinician if code is provided
       final clinicianCode = _clinicianCodeController.text.trim();
@@ -127,14 +207,27 @@ class _PatientProfileCompletionPageState extends State<PatientProfileCompletionP
       // Save patient ID for later use
       final storage = await PatientStorage.create();
       await storage.savePatientId(userId);
+      await storage.setProfileCompleted(true);
+      
+      // Check if VOSS already completed on server
+      final voss = await client
+          .from('voss_questionnaires')
+          .select()
+          .eq('patient_id', userId)
+          .maybeSingle();
       
       if (mounted) {
-        // Navigate to VOSS questionnaire instead of home
-        await Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => VossQuestionnairePage(patientId: userId),
-          ),
-        );
+        if (voss == null) {
+          // Only ask once
+          await Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => VossQuestionnairePage(patientId: userId),
+            ),
+          );
+        } else {
+          // Go home if questionnaire is already done
+          Navigator.of(context).pushReplacementNamed('/home');
+        }
       }
     } catch (e) {
       setState(() {
@@ -153,7 +246,9 @@ class _PatientProfileCompletionPageState extends State<PatientProfileCompletionP
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF20B2AA),
       ),
-      body: SingleChildScrollView(
+      body: _isPrefillLoading
+          ? const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
@@ -177,6 +272,49 @@ class _PatientProfileCompletionPageState extends State<PatientProfileCompletionP
                 ),
               ),
               const SizedBox(height: 32),
+              // First & Last Name (required for initial creation)
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _firstNameController,
+                      decoration: InputDecoration(
+                        labelText: 'First Name *',
+                        prefixIcon: const Icon(Icons.person),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Enter first name';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _lastNameController,
+                      decoration: InputDecoration(
+                        labelText: 'Last Name *',
+                        prefixIcon: const Icon(Icons.person_outline),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Enter last name';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               // Date of Birth
               InkWell(
                 onTap: () async {

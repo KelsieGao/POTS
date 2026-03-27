@@ -5,61 +5,62 @@ class PatientProgressService {
   static SupabaseClient get _client => SupabaseService.client;
 
   static Future<PatientProgress> getProgress(String patientId) async {
+    // Each datum is resilient; one failure won't zero-out the rest.
+    int testCount = 0;
+    int logCount = 0;
+    bool vossCompleted = false;
+    bool profileComplete = false;
+
+    // Count standup tests
     try {
-      // Count standup tests
       final testsResponse = await _client
           .from('standup_tests')
           .select()
           .eq('patient_id', patientId);
-      
-      final testCount = (testsResponse as List).length;
+      testCount = (testsResponse as List).length;
+    } catch (_) {}
 
-      // Count symptom logs
+    // Count symptom logs
+    try {
       final logsResponse = await _client
           .from('symptom_logs')
           .select()
           .eq('patient_id', patientId);
-      
-      final logCount = (logsResponse as List).length;
+      logCount = (logsResponse as List).length;
+    } catch (_) {}
 
-      // Check if VOSS questionnaire is completed
+    // Check VOSS completion
+    try {
       final vossResponse = await _client
           .from('voss_questionnaires')
           .select()
           .eq('patient_id', patientId)
+          .order('completed_at', ascending: false)
+          .limit(1)
           .maybeSingle();
-      
-      final vossCompleted = vossResponse != null;
+      vossCompleted = vossResponse != null;
+    } catch (_) {}
 
-      // Check if profile is complete (has non-placeholder data)
+    // Check profile completeness
+    try {
       final patientResponse = await _client
           .from('patients')
           .select('reason_for_using_app, date_of_birth, sex_assigned_at_birth')
           .eq('id', patientId)
           .single();
-      
-      final profileComplete = patientResponse['reason_for_using_app'] != null &&
+      profileComplete = patientResponse['reason_for_using_app'] != null &&
           patientResponse['reason_for_using_app'] != 'Other' &&
           patientResponse['sex_assigned_at_birth'] != null &&
           patientResponse['sex_assigned_at_birth'] != 'Other';
+    } catch (_) {}
 
-      return PatientProgress(
-        patientId: patientId,
-        testsCompleted: testCount,
-        symptomsLogged: logCount,
-        vossCompleted: vossCompleted,
-        profileComplete: profileComplete,
-      );
-    } catch (e) {
-      // Return empty progress on error
-      return PatientProgress(
-        patientId: patientId,
-        testsCompleted: 0,
-        symptomsLogged: 0,
-        vossCompleted: false,
-        profileComplete: false,
-      );
-    }
+    return PatientProgress(
+      patientId: patientId,
+      testsCompleted: testCount,
+      symptomsLogged: logCount,
+      vossCompleted: vossCompleted,
+      profileComplete: profileComplete,
+    );
   }
 }
 
@@ -79,10 +80,11 @@ class PatientProgress {
   });
 
   // Show actual test count (n/5 format)
-  int get testProgress => testsCompleted;
+  int get testProgress => testsCompleted > maxTests ? maxTests : testsCompleted;
   int get maxTests => 5;
   
-  String get testProgressText => '$testsCompleted/$maxTests tests completed';
+  String get testProgressText =>
+      '${testsCompleted > maxTests ? maxTests : testsCompleted}/$maxTests tests completed';
   
   int get totalItems => symptomsLogged;
   bool get hasVoss => vossCompleted;

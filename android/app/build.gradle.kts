@@ -10,6 +10,12 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    sourceSets {
+        named("main") {
+            jniLibs.srcDirs("src/main/jniLibs")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -37,8 +43,18 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+    
+    packaging {
+        pickFirst("**/libc++_shared.so")
+        pickFirst("**/libBodyfat_SDK.so")
+        pickFirst("**/libiHealth.so")
+    }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation(files("libs/iHealthSDK_2.15.1.jar"))
 }

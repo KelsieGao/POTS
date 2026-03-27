@@ -2,27 +2,31 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:pots/features/polar/polar_heart_rate_controller.dart';
-import 'package:pots/features/ihealth/ihealth_bp_controller.dart';
+// import 'package:pots/features/ihealth/ihealth_bp_controller.dart'; // TODO: Re-implement with native SDK
 import 'package:pots/features/standup_test/models/standup_test_data.dart';
 import 'package:pots/features/standup_test/pages/safety_acknowledgment_page.dart';
 import 'package:pots/features/standup_test/services/safety_service.dart';
+import 'package:pots/shared/ihealth_kn550_service.dart';
 
 import 'controllers/standup_test_controller.dart';
 import 'widgets/countdown_display.dart';
 import 'widgets/pots_instruction_video.dart';
 import 'widgets/automated_bp_input.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter/services.dart';
+import 'widgets/device_auto_bp_capture.dart';
 
 class StandupTestFlowPage extends StatefulWidget {
   const StandupTestFlowPage({
     super.key,
     required this.polarController,
-    required this.ihealthBpController,
+    // required this.ihealthBpController, // TODO: Re-implement with native SDK
     required this.patientId,
     this.demoMode = true,
   });
 
   final PolarHeartRateController polarController;
-  final IHealthBpController ihealthBpController;
+  // final IHealthBpController ihealthBpController; // TODO: Re-implement with native SDK
   final String patientId;
   final bool demoMode;
 
@@ -42,24 +46,24 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
     super.initState();
     _controller = StandupTestController(
       polarController: widget.polarController,
-      ihealthBpController: widget.ihealthBpController,
+      // ihealthBpController: widget.ihealthBpController, // TODO: Re-implement with native SDK
       patientId: widget.patientId,
       demoMode: widget.demoMode,
     )..addListener(_handleUpdate);
     
     // Initialize iHealth connection
-    _initializeIHealth();
+    // _initializeIHealth(); // TODO: Re-implement with native SDK
     
     // Check for safety acknowledgment before starting
     _checkSafetyAcknowledgment();
   }
   
-  Future<void> _initializeIHealth() async {
+  /* Future<void> _initializeIHealth() async { // TODO: Re-implement with native SDK
     // Connect to iHealth device if known
     await widget.ihealthBpController.connectIfKnown();
     // Update patient ID
     widget.ihealthBpController.updatePatientId(widget.patientId);
-  }
+  } */
 
   void _handleUpdate() {
     if (!mounted) return;
@@ -275,7 +279,11 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
   Widget _buildBody() {
     switch (_controller.step) {
       case StandupStep.intro:
-        return _IntroStep(onStart: _controller.next);
+        return _IntroStep(
+          onStart: _controller.next,
+          polarConnected: _controller.polarController.status == PolarConnectionStatus.connected || _controller.polarController.status == PolarConnectionStatus.streaming,
+          ihealthConnected: (IHealthKn550Service.instance.lastConnectedMac ?? '').isNotEmpty,
+        );
       case StandupStep.supineCountdown:
         return _CountdownStep(
           title: 'Lie down for 10 minutes',
@@ -288,14 +296,12 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
           showSafetyReminder: true,
         );
       case StandupStep.supineEntry:
-        return AutomatedBpInput(
+        return DeviceAutoBpCapture(
           title: 'Supine Blood Pressure Reading',
-          instruction: 'Take your blood pressure while lying down. Enter both values to continue automatically.',
-          onSubmit: (systolic, diastolic) {
-            _controller.setSupineBp(systolic: systolic, diastolic: diastolic);
+          message: 'Press START on your iHealth monitor now while still lying down. We will capture the reading automatically. If the blood pressure device doesn\'t work, click START twice.',
+          onCaptured: (sys, dia) {
+            _controller.setSupineBp(systolic: sys, diastolic: dia);
           },
-          latestHr: _controller.latestHeartRate,
-          ihealthBpController: widget.ihealthBpController,
         );
       case StandupStep.standPrep:
         return _StandPrepStep(
@@ -304,27 +310,25 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
           },
         );
       case StandupStep.standingCountdown1:
-        return _CountdownStep(
-          title: 'Standing · 1 minute',
-          description: 'Remain standing. We\'ll capture a reading at 1 minute.',
-          remaining: _controller.remaining,
-          latestHr: _controller.latestHeartRate,
-          onSkip: _controller.demoMode ? _controller.skipCurrentStep : null,
-          onCancel: _showCancelConfirmation,
-          showSafetyReminder: true,
+        return _TtsOnce(
+          message: 'Please stand up now',
+          child: _CountdownStep(
+            title: 'Standing · 1 minute',
+            description: 'Remain standing. We\'ll capture a reading at 1 minute.',
+            remaining: _controller.remaining,
+            latestHr: _controller.latestHeartRate,
+            onSkip: _controller.demoMode ? _controller.skipCurrentStep : null,
+            onCancel: _showCancelConfirmation,
+            showSafetyReminder: true,
+          ),
         );
       case StandupStep.standingEntry1:
-        return AutomatedBpInput(
+        return DeviceAutoBpCapture(
           title: '1-Minute Standing Blood Pressure',
-          instruction: 'You\'ve been standing for 1 minute. Take your blood pressure reading now.',
-          onSubmit: (systolic, diastolic) {
-            _controller.setStanding1Min(
-              systolic: systolic,
-              diastolic: diastolic,
-            );
+          message: 'You\'ve been standing for 1 minute. Press START on your iHealth monitor now. We will capture the reading automatically. If the blood pressure device doesn\'t work, click START twice.',
+          onCaptured: (sys, dia) {
+            _controller.setStanding1Min(systolic: sys, diastolic: dia);
           },
-          latestHr: _controller.latestHeartRate,
-          ihealthBpController: widget.ihealthBpController,
         );
       case StandupStep.standingCountdownTo3:
         // Check if we just finished BP input - show continue prompt instead
@@ -348,17 +352,12 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
           showSafetyReminder: true,
         );
       case StandupStep.standingEntry3:
-        return AutomatedBpInput(
+        return DeviceAutoBpCapture(
           title: '3-Minute Standing Blood Pressure',
-          instruction: 'You\'ve been standing for 3 minutes. Take your blood pressure reading now.',
-          onSubmit: (systolic, diastolic) {
-            _controller.setStanding3Min(
-              systolic: systolic,
-              diastolic: diastolic,
-            );
+          message: 'You\'ve been standing for 3 minutes. Press START on your iHealth monitor now. We will capture the reading automatically. If the blood pressure device doesn\'t work, click START twice.',
+          onCaptured: (sys, dia) {
+            _controller.setStanding3Min(systolic: sys, diastolic: dia);
           },
-          latestHr: _controller.latestHeartRate,
-          ihealthBpController: widget.ihealthBpController,
         );
       case StandupStep.standingCountdownTo5:
         // Check if we just finished BP input - show continue prompt instead
@@ -395,8 +394,8 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
       case StandupStep.summary:
         return _SummaryStep(
           data: _controller.data,
+          onEnsureBpFromLastThree: _controller.ensureBpFromLastThree,
           onSubmit: () {
-            // Notes are saved automatically in _SummaryStepState._submit
             _controller.submit();
           },
         );
@@ -416,9 +415,11 @@ class _StandupTestFlowPageState extends State<StandupTestFlowPage> {
 }
 
 class _IntroStep extends StatelessWidget {
-  const _IntroStep({required this.onStart});
+  const _IntroStep({required this.onStart, required this.polarConnected, required this.ihealthConnected});
 
   final VoidCallback onStart;
+  final bool polarConnected;
+  final bool ihealthConnected;
 
   @override
   Widget build(BuildContext context) {
@@ -430,6 +431,26 @@ class _IntroStep extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (!polarConnected || !ihealthConnected)
+                  Card(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.info_outline),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Before you start: ${!polarConnected ? 'Connect Polar heart rate monitor' : ''}${(!polarConnected && !ihealthConnected) ? ' and ' : ''}${!ihealthConnected ? 'Connect iHealth BP cuff' : ''}.',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 // Safety warning at the top
                 Card(
                   color: Theme.of(context).colorScheme.errorContainer,
@@ -938,10 +959,11 @@ class _AutomaticInstructionStepState extends State<_AutomaticInstructionStep> {
 }
 
 class _SummaryStep extends StatefulWidget {
-  const _SummaryStep({required this.data, required this.onSubmit});
+  const _SummaryStep({required this.data, required this.onSubmit, this.onEnsureBpFromLastThree});
 
   final StandupTestData data;
   final VoidCallback onSubmit;
+  final Future<void> Function()? onEnsureBpFromLastThree;
 
   @override
   State<_SummaryStep> createState() => _SummaryStepState();
@@ -954,6 +976,12 @@ class _SummaryStepState extends State<_SummaryStep> {
   void initState() {
     super.initState();
     _notesController = TextEditingController(text: widget.data.notes ?? '');
+    if (widget.onEnsureBpFromLastThree != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await widget.onEnsureBpFromLastThree!.call();
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   @override
@@ -1138,10 +1166,37 @@ class _ErrorStep extends StatelessWidget {
   }
 }
 
-class _StandPrepStep extends StatelessWidget {
+class _StandPrepStep extends StatefulWidget {
   const _StandPrepStep({required this.onNext});
 
   final VoidCallback onNext;
+
+  @override
+  State<_StandPrepStep> createState() => _StandPrepStepState();
+}
+
+class _StandPrepStepState extends State<_StandPrepStep> {
+  final FlutterTts _tts = FlutterTts();
+
+  @override
+  void initState() {
+    super.initState();
+    Future(() async {
+      try {
+        await _tts.setLanguage('en-US');
+        await _tts.setVolume(1.0);
+        await _tts.setSpeechRate(0.5);
+        await _tts.setPitch(1.0);
+        await _tts.speak('Please stand up now');
+      } catch (_) {}
+    });
+  }
+
+  @override
+  void dispose() {
+    try { _tts.stop(); } catch (_) {}
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1168,7 +1223,7 @@ class _StandPrepStep extends StatelessWidget {
         ),
         const Spacer(),
         FilledButton(
-          onPressed: onNext,
+          onPressed: widget.onNext,
           style: FilledButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
@@ -1177,6 +1232,48 @@ class _StandPrepStep extends StatelessWidget {
       ],
     );
   }
+}
+
+class _TtsOnce extends StatefulWidget {
+  const _TtsOnce({required this.message, required this.child});
+
+  final String message;
+  final Widget child;
+
+  @override
+  State<_TtsOnce> createState() => _TtsOnceState();
+}
+
+class _TtsOnceState extends State<_TtsOnce> {
+  final FlutterTts _tts = FlutterTts();
+
+  @override
+  void initState() {
+    super.initState();
+    Future(() async {
+      try {
+        // Audible cue even if TTS fails
+        SystemSound.play(SystemSoundType.alert);
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        await _tts.setLanguage('en-US');
+        await _tts.setVolume(1.0);
+        await _tts.setSpeechRate(0.5);
+        await _tts.setPitch(1.0);
+        await _tts.awaitSpeakCompletion(true);
+        await _tts.stop();
+        await _tts.speak(widget.message);
+      } catch (_) {}
+    });
+  }
+
+  @override
+  void dispose() {
+    try { _tts.stop(); } catch (_) {}
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _NextStepPrompt extends StatelessWidget {

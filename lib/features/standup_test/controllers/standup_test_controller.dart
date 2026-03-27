@@ -3,10 +3,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:pots/features/polar/polar_heart_rate_controller.dart';
-import 'package:pots/features/ihealth/ihealth_bp_controller.dart';
+// import 'package:pots/features/ihealth/ihealth_bp_controller.dart'; // TODO: Re-implement with native SDK
 
 import '../models/standup_test_data.dart';
 import '../services/standup_test_service.dart';
+import 'package:pots/shared/ihealth_kn550_service.dart';
 
 enum StandupStep {
   intro,
@@ -28,14 +29,14 @@ enum StandupStep {
 class StandupTestController extends ChangeNotifier {
   StandupTestController({
     required this.polarController,
-    required this.ihealthBpController,
+    // required this.ihealthBpController, // TODO: Re-implement with native SDK
     required this.patientId,
     this.demoMode = true,
     StandupTestService? service,
   }) : _service = service ?? StandupTestService();
 
   final PolarHeartRateController polarController;
-  final IHealthBpController ihealthBpController;
+  // final IHealthBpController ihealthBpController; // TODO: Re-implement with native SDK
   final String patientId;
   final bool demoMode;
   final StandupTestService _service;
@@ -47,7 +48,26 @@ class StandupTestController extends ChangeNotifier {
 
   Timer? _timer;
 
+  // De-dup marker per session
+  DateTime? _lastBpSyncedAt;
+
   bool get isCountdownActive => _timer != null;
+
+  /// Fetch latest KN‑550BT reading and return (or null on timeout/none).
+  Future<Map<String, int>?> fetchLatestBpReading({Duration timeout = const Duration(seconds: 8)}) async {
+    try {
+      final rec = await IHealthKn550Service.instance.fetchLatest(totalTimeout: timeout);
+      if (rec == null) return null;
+      _lastBpSyncedAt = rec.time;
+      return {
+        'systolic': rec.systolic,
+        'diastolic': rec.diastolic,
+        'heartRate': rec.heartRate,
+      };
+    } catch (_) {
+      return null;
+    }
+  }
   int? get latestHeartRate => polarController.heartRate;
 
   String? errorMessage;
@@ -76,11 +96,8 @@ class StandupTestController extends ChangeNotifier {
     
     debugPrint('Supine BP set: ${data.supineSystolic}/${data.supineDiastolic}');
     
-    // Automatically advance to stand prep after BP entry
-    step = StandupStep.standPrep;
-    notifyListeners();
-    
-    // NO auto-advance - user must manually proceed
+    // Automatically begin standing countdown (no manual continue)
+    _startStandingCountdown1();
   }
 
   void setStanding1Min({int? systolic, int? diastolic}) {
@@ -91,9 +108,8 @@ class StandupTestController extends ChangeNotifier {
     
     debugPrint('Standing 1min BP set: ${data.standing1MinSystolic}/${data.standing1MinDiastolic}');
     
-    // Show a "ready" prompt - user clicks continue button
-    step = StandupStep.standingCountdownTo3;
-    notifyListeners();
+    // Immediately start countdown to 3 minutes
+    _startStandingCountdownTo3();
   }
 
   void setStanding3Min({int? systolic, int? diastolic}) {
@@ -104,9 +120,37 @@ class StandupTestController extends ChangeNotifier {
     
     debugPrint('Standing 3min BP set: ${data.standing3MinSystolic}/${data.standing3MinDiastolic}');
     
-    // Show a "ready" prompt - user clicks continue button
-    step = StandupStep.standingCountdownTo5;
-    notifyListeners();
+    // Immediately start countdown to 5 minutes
+    _startStandingCountdownTo5();
+  }
+
+  /// Best-effort: At the end of the test, read the last three offline BP
+  /// records from the cuff and fill any missing supine/1min/3min values.
+  Future<void> ensureBpFromLastThree() async {
+    try {
+      final mac = IHealthKn550Service.instance.lastConnectedMac;
+      if (mac == null || mac.isEmpty) return;
+      final dataList = await IHealthKn550Service.instance.getOfflineData(mac);
+      if (dataList.isEmpty) return;
+      dataList.sort((a, b) => a.time.compareTo(b.time));
+      final start = dataList.length >= 3 ? dataList.length - 3 : 0;
+      final last3 = dataList.sublist(start);
+      if (last3.isNotEmpty) {
+        final sup = last3.first;
+        data.supineSystolic ??= sup.systolic;
+        data.supineDiastolic ??= sup.diastolic;
+      }
+      if (last3.length >= 2) {
+        final m = last3[last3.length - 2];
+        data.standing1MinSystolic ??= m.systolic;
+        data.standing1MinDiastolic ??= m.diastolic;
+      }
+      if (last3.isNotEmpty) {
+        final latest = last3.last;
+        data.standing3MinSystolic ??= latest.systolic;
+        data.standing3MinDiastolic ??= latest.diastolic;
+      }
+    } catch (_) {}
   }
 
   void cancelCountdown() {
@@ -201,8 +245,10 @@ class StandupTestController extends ChangeNotifier {
   // Add method for final BP reading (optional 10-minute reading)
   void setStanding10Min({int? systolic, int? diastolic}) {
     // Use values from iHealth controller if provided, otherwise use passed values
-    final sys = systolic ?? ihealthBpController.latestSystolic ?? 0;
-    final dia = diastolic ?? ihealthBpController.latestDiastolic ?? 0;
+    // final sys = systolic ?? ihealthBpController.latestSystolic ?? 0; // TODO: Re-implement with native SDK
+    // final dia = diastolic ?? ihealthBpController.latestDiastolic ?? 0; // TODO: Re-implement with native SDK
+    final sys = systolic ?? 0;
+    final dia = diastolic ?? 0;
     
     data.standing10MinSystolic = sys;
     data.standing10MinDiastolic = dia;

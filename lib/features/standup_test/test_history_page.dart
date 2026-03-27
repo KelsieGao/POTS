@@ -162,17 +162,21 @@ class _TestHistoryCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
+            // Fallback to createdAt if testDate looks invalid (1970)
             Text(
-              dateFormat.format(test.testDate),
+              dateFormat.format(
+                (test.testDate.year <= 1971)
+                    ? (test.createdAt ?? DateTime.now())
+                    : test.testDate,
+              ),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            if (test.testTime != null)
-              Text(
-                timeFormat.format(test.testTime!),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+            Text(
+              timeFormat.format(test.testTime),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
+            ),
           ],
         ),
         children: [

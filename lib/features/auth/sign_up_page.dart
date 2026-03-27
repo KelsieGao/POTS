@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/services/auth_service.dart';
 import 'sign_in_page.dart';
-import 'patient_profile_completion_page.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -15,8 +14,6 @@ class _SignUpPageState extends State<SignUpPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -36,34 +33,19 @@ class _SignUpPageState extends State<SignUpPage> {
     try {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
-      final firstName = _firstNameController.text.trim();
-      final lastName = _lastNameController.text.trim();
 
       // Sign up with Supabase Auth
-      final user = await AuthService.signUpAndSendOTP(
+      await AuthService.signUpAndSendOTP(
         email: email,
         password: password,
-        firstName: firstName,
-        lastName: lastName,
       );
 
-      // Create basic patient profile
-      await AuthService.createBasicPatientProfile(
-        userId: user.id,
-        firstName: firstName,
-        lastName: lastName,
-      );
-
-      // Sign in the user
+      // Sign in the user so the on-home gating can drive the profile flow
       await AuthService.signIn(email: email, password: password);
 
       if (mounted) {
-        // Navigate to profile completion page
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const PatientProfileCompletionPage(),
-          ),
-        );
+        // Go to home; the app will route to profile completion if needed
+        Navigator.of(context).pushReplacementNamed('/home');
       }
     } catch (e) {
       setState(() {
@@ -78,8 +60,6 @@ class _SignUpPageState extends State<SignUpPage> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _firstNameController.dispose();
-    _lastNameController.dispose();
     super.dispose();
   }
 
@@ -116,40 +96,9 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
               ),
               const SizedBox(height: 32),
-              TextFormField(
-                controller: _firstNameController,
-                decoration: InputDecoration(
-                  labelText: 'First Name',
-                  prefixIcon: const Icon(Icons.person),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your first name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _lastNameController,
-                decoration: InputDecoration(
-                  labelText: 'Last Name',
-                  prefixIcon: const Icon(Icons.person_outline),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your last name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
+              // Email-only sign up (name collected during profile completion)
+              const SizedBox(height: 0),
+              // Email
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
